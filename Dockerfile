@@ -10,7 +10,7 @@ COPY . .
 
 RUN go build -o app ./cmd/api
 
-EXPOSE 4000
+EXPOSE 80 443
 
 RUN chmod +x app
 

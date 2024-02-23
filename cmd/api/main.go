@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -54,7 +55,15 @@ func (app *application) serve() error {
 func configure() config {
 	var config config
 
-	flag.IntVar(&config.port, "port", 4000, "Application service port")
+	defaultPort := 4000
+	if os.Getenv("PORT") != "" {
+		p, err := strconv.Atoi(os.Getenv("PORT"))
+		if err == nil {
+			defaultPort = p
+		}
+	}
+
+	flag.IntVar(&config.port, "port", defaultPort, "Application service port")
 	flag.StringVar(&config.env, "env", "development", "Environment (development|staging|production)")
 
 	flag.Parse()
