@@ -1,0 +1,23 @@
+# Ignore common editor and system files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+.git/
+
+# Ignore Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore Go test artifacts
+*.test
+*.out
+
+# Ignore vendor directory
+vendor/
+
+# Ignore any other generated or temporary files
+tmp/
