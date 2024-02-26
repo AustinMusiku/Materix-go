@@ -1,12 +1,17 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/AustinMusiku/Materix-go/internal/data"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
@@ -45,10 +50,7 @@ func mountApiRouter(r *chi.Mux) *chi.Mux {
 	apiRouter := chi.NewRouter()
 
 	apiRouter.Route("/v1", func(r chi.Router) {
-		r.Route("/auth", func(r chi.Router) {
-			r.Get("/github/callback", GithubOauthHandler)
-			r.Get("/google/callback", GoogleOauthHandler)
-		})
+		r.Get("/auth/callback", oauthCallbackHandler)
 	})
 
 	r.Mount("/api", apiRouter)
@@ -56,22 +58,38 @@ func mountApiRouter(r *chi.Mux) *chi.Mux {
 	return r
 }
 
-func GoogleOauthHandler(w http.ResponseWriter, r *http.Request) {
-	clientId := os.Getenv("GOOGLE_CLIENT_ID")
-	clientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
+	var clientId string
+	var clientSecret string
+	var baseAccessTokenUrl string
+	var oauthProvider string
+
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
-	redirect_uri := "https://materix.up.railway.app/api/v1/auth/google/callback"
+	redirect_uri := "https://materix.up.railway.app/api/v1/auth/callback"
 
-	baseAccessTokenUrl := "https://oauth2.googleapis.com/token"
-	authTokenUrl := fmt.Sprintf("%s?client_id=%s&client_secret=%s&code=%s&redirect_uri=%s&grant_type=authorization_code", baseAccessTokenUrl, clientId, clientSecret, code, redirect_uri)
-
+	// Verify state
 	if state != os.Getenv("OAUTH2_CALLBACK_STATE") {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Invalid state"))
 		return
 	}
 
+	// Assign provider value to oauthProvider variable by examining the request URL
+	if strings.Contains(r.URL.String(), "google") {
+		clientId = os.Getenv("GOOGLE_CLIENT_ID")
+		clientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+		baseAccessTokenUrl = "https://oauth2.googleapis.com/token"
+		oauthProvider = "google"
+	} else if strings.Contains(r.URL.String(), "github") {
+		clientId = os.Getenv("GITHUB_CLIENT_ID")
+		clientSecret = os.Getenv("GITHUB_CLIENT_SECRET")
+		baseAccessTokenUrl = "https://github.com/login/oauth/access_token"
+		oauthProvider = "github"
+	}
+
+	// Exchange code for access token
+	authTokenUrl := fmt.Sprintf("%s?client_id=%s&client_secret=%s&code=%s&redirect_uri=%s&grant_type=authorization_code", baseAccessTokenUrl, clientId, clientSecret, code, redirect_uri)
 	req, err := http.NewRequest("POST", authTokenUrl, nil)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -91,16 +109,8 @@ func GoogleOauthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer res.Body.Close()
 
-	tokenResponse := struct {
-		Access_token  string `json:"access_token"`
-		Scope         string `json:"scope"`
-		Token_type    string `json:"token_type"`
-		Expires_in    int    `json:"expires_in"`
-		Refresh_token string `json:"refresh_token"`
-		Id_token      string `json:"id_token"`
-	}{}
-
-	err = json.NewDecoder(res.Body).Decode(&tokenResponse)
+	// Read response body
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("Internal server error: %s", err)
@@ -108,10 +118,31 @@ func GoogleOauthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract user info from id_token
+	userInfo, err := extractOauthUser(string(body), oauthProvider)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		msg := fmt.Sprintf("Internal server error: %s", err)
+		w.Write([]byte(msg))
+		return
+	}
+
+	// Create a new user
+	user := data.User{
+		Email:      userInfo.Email,
+		FirstName:  userInfo.firstName,
+		LastName:   userInfo.lastName,
+		Activated:  true,
+		Avatar_url: userInfo.Avatar_url,
+		Provider:   oauthProvider,
+		CreatedAt:  time.Now().Format(time.RFC3339),
+		UpdatedAt:  time.Now().Format(time.RFC3339),
+	}
+
 	// TODO: Save user in database
 	// TODO: Create and sign a JWT token
 	// TODO: Send access token to user via json response
-	data, err := json.MarshalIndent(tokenResponse, "", "\t")
+	data, err := json.MarshalIndent(user, "", "\t")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("Internal server error: %s", err)
@@ -122,65 +153,85 @@ func GoogleOauthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(data))
 }
 
-func GithubOauthHandler(w http.ResponseWriter, r *http.Request) {
-	clientId := os.Getenv("GITHUB_CLIENT_ID")
-	clientSecret := os.Getenv("GITHUB_CLIENT_SECRET")
-	code := r.URL.Query().Get("code")
-	state := r.URL.Query().Get("state")
-	redirect_uri := "https://materix.up.railway.app/api/v1/auth/github/callback"
+type oauthUserInfo struct {
+	Email      string
+	firstName  string
+	lastName   string
+	Provider   string
+	Avatar_url string
+}
 
-	baseAccessTokenUrl := "https://github.com/login/oauth/access_token"
-	authTokenUrl := fmt.Sprintf("%s?client_id=%s&client_secret=%s&code=%s&redirect_uri=%s&grant_type=authorization_code", baseAccessTokenUrl, clientId, clientSecret, code, redirect_uri)
+func extractOauthUser(token, provider string) (oauthUserInfo, error) {
+	var userInfo oauthUserInfo
 
-	if state != os.Getenv("OAUTH2_CALLBACK_STATE") {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Invalid state"))
-		return
-	}
+	claims := make(map[string]interface{})
+	parts := strings.Split(token, ".")
 
-	req, err := http.NewRequest("POST", authTokenUrl, nil)
+	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
+		return userInfo, err
 	}
-	req.Header.Set("Accept", "application/json")
+
+	err = json.Unmarshal(decoded, &claims)
+	if err != nil {
+		return userInfo, err
+	}
+
+	userInfo.Provider = provider
+	if provider == "github" {
+		names := strings.Split(claims["name"].(string), " ")
+		userInfo.firstName = names[0]
+		userInfo.lastName = strings.Join(names[1:], " ")
+		userInfo.Avatar_url = claims["avatar_url"].(string)
+
+		email, err := fetchGithubUserEmail(parts[0])
+		if err != nil {
+			return userInfo, err
+		}
+		userInfo.Email = email
+	} else if provider == "google" {
+		userInfo.Email = claims["email"].(string)
+		userInfo.firstName = claims["given_name"].(string)
+		userInfo.lastName = claims["family_name"].(string)
+		userInfo.Avatar_url = claims["picture"].(string)
+	}
+
+	return userInfo, nil
+}
+
+func fetchGithubUserEmail(token string) (string, error) {
+	req, err := http.NewRequest("GET", "https://api.github.com/user/emails", nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 5,
 	}
+
 	res, err := client.Do(req)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
-		return
+		return "", errors.New("failed to fetch user email")
 	}
 	defer res.Body.Close()
 
-	var tokenResponse struct {
-		AccessToken string `json:"access_token"`
-		Scope       string `json:"scope"`
-		TokenType   string `json:"token_type"`
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
 	}
 
-	err = json.NewDecoder(res.Body).Decode(&tokenResponse)
+	err = json.NewDecoder(res.Body).Decode(&emails)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		w.Write([]byte(msg))
-		return
+		return "", errors.New("failed to fetch user email")
 	}
 
-	// TODO: Save user in database
-	// TODO: Create and sign a JWT token
-	// TODO: Send access token to user via json response
-	data, err := json.MarshalIndent(tokenResponse, "", "\t")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		w.Write([]byte(msg))
-		return
+	for _, email := range emails {
+		if email.Primary && email.Verified {
+			return email.Email, nil
+		}
 	}
 
-	w.Write([]byte(data))
+	return "", errors.New("failed to fetch user email")
 }
