@@ -73,13 +73,13 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assign provider value to oauthProvider variable by examining the request URL
+	// Assign provider value to oauthProvider after examining the request URL
 	if strings.Contains(r.URL.String(), "google") {
 		clientId = os.Getenv("GOOGLE_CLIENT_ID")
 		clientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 		baseAccessTokenUrl = "https://oauth2.googleapis.com/token"
 		oauthProvider = "google"
-	} else if strings.Contains(r.URL.String(), "github") {
+	} else {
 		clientId = os.Getenv("GITHUB_CLIENT_ID")
 		clientSecret = os.Getenv("GITHUB_CLIENT_SECRET")
 		baseAccessTokenUrl = "https://github.com/login/oauth/access_token"
@@ -92,6 +92,7 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
+		return
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -102,6 +103,7 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
+		return
 	}
 	defer res.Body.Close()
 
@@ -113,6 +115,7 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
+		return
 	}
 
 	// Extract user info from provider api
@@ -121,6 +124,7 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		w.Write([]byte(msg))
+		return
 	}
 
 	// Create a new user
