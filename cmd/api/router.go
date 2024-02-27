@@ -1,11 +1,9 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -94,7 +92,6 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
-		return
 	}
 	req.Header.Set("Accept", "application/json")
 
@@ -105,26 +102,25 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
-		return
 	}
 	defer res.Body.Close()
 
 	// Read response body
-	body, err := io.ReadAll(res.Body)
+	token := struct {
+		Access_token string `json:"access_token"`
+	}{}
+	err = json.NewDecoder(res.Body).Decode(&token)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		w.Write([]byte(msg))
-		return
+		w.Write([]byte("Internal server error"))
 	}
 
-	// Extract user info from id_token
-	userInfo, err := extractOauthUser(string(body), oauthProvider)
+	// Extract user info from provider api
+	userInfo, err := extractOauthUser(token.Access_token, oauthProvider)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		w.Write([]byte(msg))
-		return
 	}
 
 	// Create a new user
@@ -161,40 +157,65 @@ type oauthUserInfo struct {
 	Avatar_url string
 }
 
-func extractOauthUser(token, provider string) (oauthUserInfo, error) {
+func extractOauthUser(accessToken string, provider string) (oauthUserInfo, error) {
 	var userInfo oauthUserInfo
 
-	claims := make(map[string]interface{})
-	parts := strings.Split(token, ".")
+	userEndpoint := "https://api.github.com/user"
+	if provider == "google" {
+		userEndpoint = "https://www.googleapis.com/oauth2/v3/userinfo"
+	}
 
-	decoded, err := base64.RawURLEncoding.DecodeString(parts[1])
+	// Request user profile info
+	req, err := http.NewRequest("GET", userEndpoint, nil)
+	if err != nil {
+		return userInfo, err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	client := &http.Client{
+		Timeout: time.Second * 5,
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return userInfo, err
+	}
+	defer res.Body.Close()
+
+	// Parse api response
+	var body struct {
+		Name        string `json:"name"`
+		Email       string `json:"email"`
+		Avatar_url  string `json:"avatar_url"`
+		Picture     string `json:"picture"`
+		Given_name  string `json:"given_name"`
+		Family_name string `json:"family_name"`
+	}
+	err = json.NewDecoder(res.Body).Decode(&body)
 	if err != nil {
 		return userInfo, err
 	}
 
-	err = json.Unmarshal(decoded, &claims)
-	if err != nil {
-		return userInfo, err
-	}
-
-	userInfo.Provider = provider
 	if provider == "github" {
-		names := strings.Split(claims["name"].(string), " ")
+		if body.Email == "" {
+			email, err := fetchGithubUserEmail(accessToken)
+			if err != nil {
+				return userInfo, err
+			}
+			body.Email = email
+		}
+		names := strings.Split(body.Name, " ")
 		userInfo.firstName = names[0]
 		userInfo.lastName = strings.Join(names[1:], " ")
-		userInfo.Avatar_url = claims["avatar_url"].(string)
-
-		email, err := fetchGithubUserEmail(parts[0])
-		if err != nil {
-			return userInfo, err
-		}
-		userInfo.Email = email
+		userInfo.Avatar_url = body.Avatar_url
+		userInfo.Email = body.Email
 	} else if provider == "google" {
-		userInfo.Email = claims["email"].(string)
-		userInfo.firstName = claims["given_name"].(string)
-		userInfo.lastName = claims["family_name"].(string)
-		userInfo.Avatar_url = claims["picture"].(string)
+		userInfo.Email = body.Email
+		userInfo.firstName = body.Given_name
+		userInfo.lastName = body.Family_name
+		userInfo.Avatar_url = body.Picture
 	}
+	userInfo.Provider = provider
 
 	return userInfo, nil
 }
