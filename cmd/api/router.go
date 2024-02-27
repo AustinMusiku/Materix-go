@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/data"
+	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
@@ -49,11 +50,60 @@ func mountApiRouter(r *chi.Mux) *chi.Mux {
 
 	apiRouter.Route("/v1", func(r chi.Router) {
 		r.Get("/auth/callback", oauthCallbackHandler)
+		r.Post("/auth/signup", signupHandler)
 	})
 
 	r.Mount("/api", apiRouter)
 
 	return r
+}
+
+func signupHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email     string `json:"email"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Password  string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid request body"))
+		return
+	}
+
+	user := data.User{
+		Email:      input.Email,
+		FirstName:  input.FirstName,
+		LastName:   input.LastName,
+		Activated:  false,
+		Avatar_url: "",
+		Provider:   "email",
+	}
+	err = user.Password.Set(input.Password)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	v := validator.New()
+	if data.ValidateUser(v, &user); !v.Valid() {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
+		w.Write([]byte(errors))
+	}
+
+	data, err := json.MarshalIndent(user, "", "\t")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		msg := fmt.Sprintf("Internal server error: %s", err)
+		w.Write([]byte(msg))
+		return
+	}
+
+	w.Write([]byte(data))
 }
 
 func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -135,8 +185,6 @@ func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		Activated:  true,
 		Avatar_url: userInfo.Avatar_url,
 		Provider:   oauthProvider,
-		CreatedAt:  time.Now().Format(time.RFC3339),
-		UpdatedAt:  time.Now().Format(time.RFC3339),
 	}
 
 	// TODO: Save user in database
