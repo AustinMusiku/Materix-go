@@ -72,7 +72,7 @@ func (l *Logger) Error(err error, fields map[string]string) {
 }
 
 func (l *Logger) Fatal(err error, fields map[string]string) {
-	l.write(LevelInfo, err.Error(), fields)
+	l.write(LevelFatal, err.Error(), fields)
 	l.Exit(1)
 }
 
