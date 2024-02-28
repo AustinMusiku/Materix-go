@@ -124,9 +124,14 @@ func (l *Logger) SetMinLevel(level Level) {
 func (l *Logger) Close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if closer, ok := l.out.(io.Closer); ok {
-		closer.Close()
+	if l.out != os.Stdin && l.out != os.Stdout && l.out != os.Stderr {
+		if closer, ok := l.out.(io.Closer); ok {
+			closer.Close()
+		}
 	}
+
+	l.out = nil
+	l.buf = nil
 }
 
 // Implement io.Writer interface so that Logger can be used with http.Server.ErrorLog.
