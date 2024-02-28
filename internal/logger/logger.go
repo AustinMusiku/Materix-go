@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -68,6 +69,7 @@ func (l *Logger) Error(err error, fields map[string]string) {
 
 func (l *Logger) Fatal(err error, fields map[string]string) {
 	l.write(LevelInfo, err.Error(), fields)
+	os.Exit(1)
 }
 
 func (l *Logger) write(level Level, message string, fields map[string]string) (int, error) {
