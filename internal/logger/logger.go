@@ -12,6 +12,10 @@ import (
 
 type Level int
 
+// Exit is a method used to exit the program.
+// This method can be replaced during testing.
+var Exit = os.Exit
+
 const (
 	LevelDebug Level = iota
 	LevelInfo
@@ -69,7 +73,11 @@ func (l *Logger) Error(err error, fields map[string]string) {
 
 func (l *Logger) Fatal(err error, fields map[string]string) {
 	l.write(LevelInfo, err.Error(), fields)
-	os.Exit(1)
+	l.Exit(1)
+}
+
+func (l *Logger) Exit(code int) {
+	Exit(code)
 }
 
 func (l *Logger) write(level Level, message string, fields map[string]string) (int, error) {
