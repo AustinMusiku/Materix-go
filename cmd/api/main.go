@@ -22,30 +22,42 @@ type config struct {
 
 type application struct {
 	config config
+	logger *logger.Logger
 }
 
 func main() {
+	config := configure()
+	if config.env == "production" {
+		config.log.minLevel = logger.LevelInfo
+	}
+	logger := logger.New(os.Stdout, config.log.minLevel)
+	logger.Debug("Starting the application", nil)
+
 	app := &application{
-		config: configure(),
+		config: config,
+		logger: logger,
 	}
 
 	err := app.serve()
 	if err != nil {
-		fmt.Println(err)
+		logger.Fatal(err, nil)
 	}
 }
 
 func (app *application) serve() error {
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.port),
-		ErrorLog:     log.New(os.Stdout, "", 0),
+		ErrorLog:     log.New(app.logger, "", 0),
 		Handler:      initRouter(),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	fmt.Printf("Server is starting on port %d...\n", app.config.port)
+	app.logger.Info("Server is starting", map[string]string{
+		"addr": server.Addr,
+		"env":  app.config.env,
+	})
 
 	err := server.ListenAndServe()
 	if err == http.ErrServerClosed {
