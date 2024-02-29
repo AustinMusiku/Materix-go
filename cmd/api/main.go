@@ -8,11 +8,16 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/AustinMusiku/Materix-go/internal/logger"
 )
 
 type config struct {
 	port int
 	env  string
+	log  struct {
+		minLevel logger.Level
+	}
 }
 
 type application struct {
@@ -65,6 +70,8 @@ func configure() config {
 
 	flag.IntVar(&config.port, "port", defaultPort, "Application service port")
 	flag.StringVar(&config.env, "env", "development", "Environment (development|staging|production)")
+
+	flag.IntVar((*int)(&config.log.minLevel), "log-level", int(logger.LevelDebug), "Minimum log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)")
 
 	flag.Parse()
 
