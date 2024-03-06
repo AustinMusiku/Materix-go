@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/logger"
+	_ "github.com/lib/pq"
 )
 
 type config struct {
@@ -17,6 +20,9 @@ type config struct {
 	env  string
 	log  struct {
 		minLevel logger.Level
+	}
+	db struct {
+		dsn string
 	}
 }
 
@@ -31,14 +37,20 @@ func main() {
 		config.log.minLevel = logger.LevelInfo
 	}
 	logger := logger.New(os.Stdout, config.log.minLevel)
-	logger.Debug("Starting the application", nil)
+
+	db, err := openDB(config)
+	if err != nil {
+		logger.Fatal(err, nil)
+	}
+	defer db.Close()
+	logger.Info("Database connection pool established", nil)
 
 	app := &application{
 		config: config,
 		logger: logger,
 	}
 
-	err := app.serve()
+	err = app.serve()
 	if err != nil {
 		logger.Fatal(err, nil)
 	}
@@ -85,7 +97,25 @@ func configure() config {
 
 	flag.IntVar((*int)(&config.log.minLevel), "log-level", int(logger.LevelDebug), "Minimum log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)")
 
+	flag.StringVar(&config.db.dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL DSN")
+
 	flag.Parse()
 
 	return config
+}
+
+func openDB(cfg config) (*sql.DB, error) {
+	db, err := sql.Open("postgres", cfg.db.dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err = db.PingContext(ctx); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
