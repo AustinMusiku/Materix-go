@@ -189,10 +189,56 @@ func (u *UserModel) GetByEmail(email string) (*User, error) {
 }
 
 func (u *UserModel) Update(user *User) error {
-	return nil
+	query := `
+		UPDATE users
+		SET name = $2, email = $3, avatar_url = $4, activated = $5, provider = $6, version = version+1, updated_at = now()
+		WHERE id = $1 AND version = $7
+		RETURNING id, uuid, created_at, updated_at, version`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	args := []interface{}{
+		user.Id,
+		user.Name,
+		user.Email,
+		user.Avatar_url,
+		user.Activated,
+		user.Provider,
+		user.Version,
+	}
+
+	return u.db.QueryRowContext(ctx, query, args...).Scan(
+		&user.Id,
+		&user.Uuid,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.Version,
+	)
 }
 
 func (u *UserModel) Delete(id int) error {
+	query := `
+		DELETE FROM users
+		WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	result, err := u.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
 	return nil
 }
 
