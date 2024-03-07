@@ -44,6 +44,39 @@ func NewUserModel(db *sql.DB) *UserModel {
 }
 
 func (u *UserModel) Insert(user *User) error {
+	query := `
+		INSERT INTO users (name, email, password, avatar_url, provider, activated)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, uuid, created_at, updated_at, version`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	args := []interface{}{
+		user.Name,
+		user.Email,
+		user.Password.hash,
+		user.Avatar_url,
+		user.Provider,
+		user.Activated,
+	}
+
+	err := u.db.QueryRowContext(ctx, query, args...).Scan(
+		&user.Id,
+		&user.Uuid,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.Version,
+	)
+	if err != nil {
+		switch {
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
+			return ErrDuplicateEmail
+		default:
+			return err
+		}
+	}
+
 	return nil
 }
 
