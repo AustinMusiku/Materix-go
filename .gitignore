@@ -24,3 +24,5 @@ bin
 go.work
 
 .vscode
+
+.envrc
