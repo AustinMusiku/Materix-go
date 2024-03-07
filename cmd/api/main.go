@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/AustinMusiku/Materix-go/internal/data"
 	"github.com/AustinMusiku/Materix-go/internal/logger"
 	_ "github.com/lib/pq"
 )
@@ -29,6 +30,7 @@ type config struct {
 type application struct {
 	config config
 	logger *logger.Logger
+	models data.Models
 }
 
 func main() {
@@ -48,6 +50,7 @@ func main() {
 	app := &application{
 		config: config,
 		logger: logger,
+		models: data.NewModels(db),
 	}
 
 	err = app.serve()
@@ -60,7 +63,7 @@ func (app *application) serve() error {
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.port),
 		ErrorLog:     log.New(app.logger, "", 0),
-		Handler:      initRouter(),
+		Handler:      app.initRouter(),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

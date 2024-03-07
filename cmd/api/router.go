@@ -15,13 +15,13 @@ import (
 	"github.com/go-chi/chi/middleware"
 )
 
-func initRouter() *chi.Mux {
+func (app *application) initRouter() *chi.Mux {
 	r := chi.NewRouter()
 
 	registerMiddleware(r)
 	registerRoutes(r)
 
-	r = mountApiRouter(r)
+	r = app.mountApiRouter(r)
 
 	return r
 }
@@ -42,15 +42,9 @@ func registerRoutes(r *chi.Mux) *chi.Mux {
 		w.Write([]byte("Welcome to the Materix!"))
 	})
 
-	return r
-}
-
-func mountApiRouter(r *chi.Mux) *chi.Mux {
-	apiRouter := chi.NewRouter()
-
-	apiRouter.Route("/v1", func(r chi.Router) {
-		r.Get("/auth/callback", oauthCallbackHandler)
-		r.Post("/auth/signup", signupHandler)
+	r.Route("/api", func(r chi.Router) {
+		r.Get("/auth/callback", app.oauthCallbackHandler)
+		r.Post("/auth/signup", app.signupHandler)
 	})
 
 	r.Mount("/api", apiRouter)
@@ -106,7 +100,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(data))
 }
 
-func oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
+func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	var clientId string
 	var clientSecret string
 	var baseAccessTokenUrl string
