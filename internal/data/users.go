@@ -153,7 +153,38 @@ func (u *UserModel) GetByName(name string) (*User, error) {
 }
 
 func (u *UserModel) GetByEmail(email string) (*User, error) {
+	query := `
+		SELECT id, uuid, name, email, password, provider, avatar_url, created_at, updated_at, activated, version
+		FROM users
+		WHERE email = $1`
+
 	var user User
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	err := u.db.QueryRowContext(ctx, query, email).Scan(
+		&user.Id,
+		&user.Uuid,
+		&user.Name,
+		&user.Email,
+		&user.Password.hash,
+		&user.Provider,
+		&user.Avatar_url,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.Activated,
+		&user.Version,
+	)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return &user, ErrRecordNotFound
+		default:
+			return &user, err
+		}
+	}
+
 	return &user, nil
 }
 
