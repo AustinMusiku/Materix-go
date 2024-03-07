@@ -1,27 +1,73 @@
 package data
 
 import (
+	"context"
+	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"golang.org/x/crypto/bcrypt"
 )
 
+const QueryTimeout = 5 * time.Second
+
+var ErrDuplicateEmail = errors.New("email already exists")
+
 type User struct {
+	Id         int      `json:"id"`
+	Uuid       string   `json:"uuid"`
+	Name       string   `json:"last_name"`
 	Email      string   `json:"email"`
-	FirstName  string   `json:"first_name"`
-	LastName   string   `json:"last_name"`
 	Password   password `json:"-"`
-	Activated  bool     `json:"activated"`
 	Avatar_url string   `json:"avatar"`
 	Provider   string   `json:"provider"`
 	CreatedAt  string   `json:"created_at"`
 	UpdatedAt  string   `json:"updated_at"`
+	Activated  bool     `json:"activated"`
+	Version    int      `json:"-"`
 }
 
 type password struct {
 	plainText *string
 	hash      []byte
+}
+
+type UserModel struct {
+	db *sql.DB
+}
+
+func NewUserModel(db *sql.DB) *UserModel {
+	return &UserModel{
+		db,
+	}
+}
+
+func (u *UserModel) Insert(user *User) error {
+	return nil
+}
+
+func (u *UserModel) GetById(id int) (*User, error) {
+	var user User
+	return &user, nil
+}
+
+func (u *UserModel) GetByName(name string) (*User, error) {
+	var user User
+	return &user, nil
+}
+
+func (u *UserModel) GetByEmail(email string) (*User, error) {
+	var user User
+	return &user, nil
+}
+
+func (u *UserModel) Update(user *User) error {
+	return nil
+}
+
+func (u *UserModel) Delete(id int) error {
+	return nil
 }
 
 func (p *password) Set(text string) error {
