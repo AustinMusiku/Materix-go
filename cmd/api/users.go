@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/data"
 	"github.com/AustinMusiku/Materix-go/internal/validator"
+	"github.com/go-chi/chi"
 )
 
 func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -189,6 +191,44 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusInternalServerError)
 		msg := fmt.Sprintf("Internal server error: %s", err)
 		w.Write([]byte(msg))
+		return
+	}
+
+	w.Write([]byte(user))
+}
+
+func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid user id"))
+		return
+	}
+
+	i, err := strconv.Atoi(id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	u, err := app.models.Users.GetById(i)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("User not found"))
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal server error"))
+		}
+		return
+	}
+
+	user, err := json.MarshalIndent(u, "", "\t")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
 		return
 	}
 
