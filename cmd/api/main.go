@@ -25,6 +25,9 @@ type config struct {
 	db struct {
 		dsn string
 	}
+	jwt struct {
+		secret string
+	}
 }
 
 type application struct {
@@ -101,6 +104,8 @@ func configure() config {
 	flag.IntVar((*int)(&config.log.minLevel), "log-level", int(logger.LevelDebug), "Minimum log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)")
 
 	flag.StringVar(&config.db.dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL DSN")
+
+	flag.StringVar(&config.jwt.secret, "jwt-secret", os.Getenv("JWT_SECRET"), "JWT secret key")
 
 	flag.Parse()
 
