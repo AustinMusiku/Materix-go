@@ -206,33 +206,37 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Create a new user
-	u := data.User{
-		Email:      userInfo.Email,
-		Name:       userInfo.firstName + " " + userInfo.lastName,
-		Activated:  true,
-		Avatar_url: userInfo.Avatar_url,
-		Provider:   oauthProvider,
-	}
-
-	// Save user in database
-	err = app.models.Users.Insert(&u)
-	if err != nil {
-		var (
-			code int
-			msg  string
-		)
-		switch {
-		case errors.Is(err, data.ErrDuplicateEmail):
-			code = http.StatusUnprocessableEntity
-			msg = "A user with this email already exists"
-		default:
-			code = http.StatusInternalServerError
-			msg = "Internal server error"
+	// Check if user exists
+	u, err := app.models.Users.GetByEmail(userInfo.Email)
+	if err != nil && !errors.Is(err, data.ErrRecordNotFound) {
+		// Create a new user
+		u := data.User{
+			Email:      userInfo.Email,
+			Name:       userInfo.firstName + " " + userInfo.lastName,
+			Activated:  true,
+			Avatar_url: userInfo.Avatar_url,
+			Provider:   oauthProvider,
 		}
-		w.WriteHeader(code)
-		w.Write([]byte(msg))
-		return
+
+		// Save user in database
+		err = app.models.Users.Insert(&u)
+		if err != nil {
+			var (
+				code int
+				msg  string
+			)
+			switch {
+			case errors.Is(err, data.ErrDuplicateEmail):
+				code = http.StatusUnprocessableEntity
+				msg = "A user with this email already exists"
+			default:
+				code = http.StatusInternalServerError
+				msg = "Internal server error"
+			}
+			w.WriteHeader(code)
+			w.Write([]byte(msg))
+			return
+		}
 	}
 
 	// TODO: Create and sign a JWT token
