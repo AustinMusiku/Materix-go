@@ -24,6 +24,7 @@ func (app *application) initRouter() *chi.Mux {
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/auth/callback", app.oauthCallbackHandler)
 		r.Post("/auth/signup", app.registerUserHandler)
+		r.Post("/auth/login", app.authenticateUserHandler)
 
 		r.Get("/users/{id}", app.getUserHandler)
 		// r.Patch("/users/{id}", app.updateUserHandler)

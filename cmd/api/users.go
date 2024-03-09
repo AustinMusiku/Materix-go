@@ -85,6 +85,57 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	w.Write([]byte(user))
 }
 
+func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid request body"))
+		return
+	}
+
+	v := validator.New()
+	data.ValidateEmail(v, input.Email)
+	data.ValidatePasswordPlaintext(v, input.Password)
+	if !v.Valid() {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
+		w.Write([]byte(errors))
+		return
+	}
+
+	u, err := app.models.Users.GetByEmail(input.Email)
+	if err != nil {
+		if errors.Is(err, data.ErrRecordNotFound) {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Invalid email or password"))
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	if ok, err := u.Password.Compare(input.Password); !ok {
+		if err == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("Invalid email or password"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal server error"))
+		}
+		return
+	}
+
+	// TODO: Create and sign a JWT token
+	// TODO: Send access token to user via json response
+
+}
+
 func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	var clientId string
 	var clientSecret string
