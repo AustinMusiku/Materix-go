@@ -34,7 +34,7 @@ func NewTokenPair(user User) (map[string]string, error) {
 		Uuid:      user.Uuid,
 		Username:  user.Name,
 		Email:     user.Email,
-		AvatarUrl: user.Avatar_url,
+		AvatarUrl: user.AvatarUrl,
 		Provider:  user.Provider,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,

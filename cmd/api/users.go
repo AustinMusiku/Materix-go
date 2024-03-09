@@ -32,11 +32,11 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	// Create a new user and set details with input values
 	u := data.User{
-		Email:      input.Email,
-		Name:       input.Name,
-		Activated:  false,
-		Avatar_url: "",
-		Provider:   "email",
+		Email:     input.Email,
+		Name:      input.Name,
+		Activated: false,
+		AvatarUrl: "",
+		Provider:  "email",
 	}
 	err = u.Password.Set(input.Password)
 	if err != nil {
@@ -229,11 +229,11 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil && !errors.Is(err, data.ErrRecordNotFound) {
 		// Create a new user
 		u = &data.User{
-			Email:      userInfo.Email,
-			Name:       userInfo.firstName + " " + userInfo.lastName,
-			Activated:  true,
-			Avatar_url: userInfo.Avatar_url,
-			Provider:   oauthProvider,
+			Email:     userInfo.Email,
+			Name:      userInfo.firstName + " " + userInfo.lastName,
+			Activated: true,
+			AvatarUrl: userInfo.AvatarUrl,
+			Provider:  oauthProvider,
 		}
 
 		// Save user in database
@@ -313,11 +313,11 @@ func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type oauthUserInfo struct {
-	Email      string
-	firstName  string
-	lastName   string
-	Provider   string
-	Avatar_url string
+	Email     string
+	firstName string
+	lastName  string
+	Provider  string
+	AvatarUrl string
 }
 
 func extractOauthUser(accessToken string, provider string) (oauthUserInfo, error) {
@@ -349,7 +349,7 @@ func extractOauthUser(accessToken string, provider string) (oauthUserInfo, error
 	var body struct {
 		Name        string `json:"name"`
 		Email       string `json:"email"`
-		Avatar_url  string `json:"avatar_url"`
+		AvatarUrl   string `json:"avatar_url"`
 		Picture     string `json:"picture"`
 		Given_name  string `json:"given_name"`
 		Family_name string `json:"family_name"`
@@ -370,13 +370,13 @@ func extractOauthUser(accessToken string, provider string) (oauthUserInfo, error
 		names := strings.Split(body.Name, " ")
 		userInfo.firstName = names[0]
 		userInfo.lastName = strings.Join(names[1:], " ")
-		userInfo.Avatar_url = body.Avatar_url
+		userInfo.AvatarUrl = body.AvatarUrl
 		userInfo.Email = body.Email
 	} else if provider == "google" {
 		userInfo.Email = body.Email
 		userInfo.firstName = body.Given_name
 		userInfo.lastName = body.Family_name
-		userInfo.Avatar_url = body.Picture
+		userInfo.AvatarUrl = body.Picture
 	}
 	userInfo.Provider = provider
 

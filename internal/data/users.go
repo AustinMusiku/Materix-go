@@ -15,17 +15,17 @@ const QueryTimeout = 5 * time.Second
 var ErrDuplicateEmail = errors.New("email already exists")
 
 type User struct {
-	Id         int      `json:"id"`
-	Uuid       string   `json:"uuid"`
-	Name       string   `json:"user_name"`
-	Email      string   `json:"email"`
-	Password   password `json:"-"`
-	Avatar_url string   `json:"avatar"`
-	Provider   string   `json:"provider"`
-	CreatedAt  string   `json:"created_at"`
-	UpdatedAt  string   `json:"updated_at"`
-	Activated  bool     `json:"activated"`
-	Version    int      `json:"-"`
+	Id        int      `json:"id"`
+	Uuid      string   `json:"uuid"`
+	Name      string   `json:"user_name"`
+	Email     string   `json:"email"`
+	Password  password `json:"-"`
+	AvatarUrl string   `json:"avatar"`
+	Provider  string   `json:"provider"`
+	CreatedAt string   `json:"created_at"`
+	UpdatedAt string   `json:"updated_at"`
+	Activated bool     `json:"activated"`
+	Version   int      `json:"-"`
 }
 
 type password struct {
@@ -56,7 +56,7 @@ func (u *UserModel) Insert(user *User) error {
 		user.Name,
 		user.Email,
 		user.Password.hash,
-		user.Avatar_url,
+		user.AvatarUrl,
 		user.Provider,
 		user.Activated,
 	}
@@ -98,7 +98,7 @@ func (u *UserModel) GetById(id int) (*User, error) {
 		&user.Email,
 		&user.Password.hash,
 		&user.Provider,
-		&user.Avatar_url,
+		&user.AvatarUrl,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.Activated,
@@ -134,7 +134,7 @@ func (u *UserModel) GetByName(name string) (*User, error) {
 		&user.Email,
 		&user.Password.hash,
 		&user.Provider,
-		&user.Avatar_url,
+		&user.AvatarUrl,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.Activated,
@@ -170,7 +170,7 @@ func (u *UserModel) GetByEmail(email string) (*User, error) {
 		&user.Email,
 		&user.Password.hash,
 		&user.Provider,
-		&user.Avatar_url,
+		&user.AvatarUrl,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 		&user.Activated,
@@ -202,7 +202,7 @@ func (u *UserModel) Update(user *User) error {
 		user.Id,
 		user.Name,
 		user.Email,
-		user.Avatar_url,
+		user.AvatarUrl,
 		user.Activated,
 		user.Provider,
 		user.Version,
