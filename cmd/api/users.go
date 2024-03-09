@@ -73,16 +73,22 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// TODO: Create and sign a JWT token
-	// TODO: Send access token to user via json response
-	user, err := json.MarshalIndent(&u, "", "\t")
+	tokens, err := data.NewTokenPair(u)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
 	}
 
-	w.Write([]byte(user))
+	jwts, err := json.MarshalIndent(tokens, "", "\t")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(jwts))
 }
 
 func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -131,9 +137,21 @@ func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// TODO: Create and sign a JWT token
-	// TODO: Send access token to user via json response
+	tokens, err := data.NewTokenPair(*u)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
 
+	jwts, err := json.MarshalIndent(tokens, "", "\t")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	w.Write([]byte(jwts))
 }
 
 func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +228,7 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 	u, err := app.models.Users.GetByEmail(userInfo.Email)
 	if err != nil && !errors.Is(err, data.ErrRecordNotFound) {
 		// Create a new user
-		u := data.User{
+		u = &data.User{
 			Email:      userInfo.Email,
 			Name:       userInfo.firstName + " " + userInfo.lastName,
 			Activated:  true,
@@ -219,7 +237,7 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 		}
 
 		// Save user in database
-		err = app.models.Users.Insert(&u)
+		err = app.models.Users.Insert(u)
 		if err != nil {
 			var (
 				code int
@@ -239,17 +257,21 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
-	// TODO: Create and sign a JWT token
-	// TODO: Send access token to user via json response
-	user, err := json.MarshalIndent(u, "", "\t")
+	tokens, err := data.NewTokenPair(*u)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		msg := fmt.Sprintf("Internal server error: %s", err)
-		w.Write([]byte(msg))
+		w.Write([]byte("Internal server error"))
 		return
 	}
 
-	w.Write([]byte(user))
+	jwts, err := json.MarshalIndent(tokens, "", "\t")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal server error"))
+		return
+	}
+
+	w.Write([]byte(jwts))
 }
 
 func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
