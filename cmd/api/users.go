@@ -312,6 +312,33 @@ func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(user))
 }
 
+func (app *application) getMyUserHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	user, err := app.models.Users.GetById(u.Id)
+	if err != nil {
+		switch err {
+		case data.ErrRecordNotFound:
+			http.Error(w, "User not found", http.StatusNotFound)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	userJson, err := json.MarshalIndent(user, "", "\t")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(userJson)
+}
+
 type oauthUserInfo struct {
 	Email     string
 	firstName string
