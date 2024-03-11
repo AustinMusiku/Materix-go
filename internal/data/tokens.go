@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -172,4 +173,21 @@ func (u *UserClaims) GetSubject() (string, error) {
 
 func (u *UserClaims) GetAudience() (jwt.ClaimStrings, error) {
 	return jwt.ClaimStrings{u.Aud}, nil
+}
+
+func (u *UserClaims) Verify() (bool, error) {
+	valid := true
+
+	valid = time.Now().After(u.Nbf.Time) && valid
+	valid = time.Now().Before(u.Exp.Time) && valid
+	valid = u.Iss == "https://materix.app" && valid
+	valid = u.Aud == "materix" && valid
+
+	id, err := strconv.ParseInt(u.Sub, 10, 64)
+	if err != nil {
+		return false, err
+	}
+	valid = id > 0 && valid
+
+	return valid, nil
 }
