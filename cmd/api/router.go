@@ -14,6 +14,7 @@ func (app *application) initRouter() *chi.Mux {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(app.authenticate)
 
 	r.Use(middleware.Heartbeat("/healthcheck"))
 
@@ -27,10 +28,30 @@ func (app *application) initRouter() *chi.Mux {
 		r.Post("/auth/login", app.authenticateUserHandler)
 
 		r.Get("/users/{id}", app.getUserHandler)
-		// r.Patch("/users/{id}", app.updateUserHandler)
-		// r.Delete("/users/{id}", app.deleteUserHandler)
 		// r.Get("/users/search", app.searchUsersHandler)
-		// r.Get("/users", app.listUsersHandler)
+
+		r.Group(func(r chi.Router) {
+			// require auth
+			r.Use(app.requireAuthentication)
+
+			r.Get("/users/me", app.getMyUserHandler)
+			// r.Patch("/users", app.updateUserHandler)
+			// r.Delete("/users", app.deleteUserHandler)
+
+			// r.Get("/friends", app.getMyFriendsHandler)
+			// r.Get("/friends/free", app.getMyFriendsFreeTimesHandler)
+			// r.Get("/friends/free/{id}", app.getFriendFreeTimesHandler)
+			// r.Get("/friends/requests", app.getMyFriendRequests)
+			// r.Post("/friends/requests", app.sendFriendRequestHandler)
+			// r.Post("/friends/requests/{id}", app.acceptFriendRequestHandler)
+			// r.Delete("/friends/requests/{id}", app.rejectFriendRequestHandler)
+			// r.Delete("/friends/{id}", app.removeFriendHandler)
+
+			// r.Get("/free", app.getMyFreeTimesHandler)
+			// r.Post("/free", app.addFreeTimeHandler)
+			// r.Patch("/free/{id}", app.updateFreeTimeHandler)
+			// r.Delete("/free/{id}", app.removeFreeTimeHandler)
+		})
 	})
 
 	return r
