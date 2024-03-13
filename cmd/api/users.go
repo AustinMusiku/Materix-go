@@ -401,6 +401,22 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 	w.Write(userJson)
 }
 
+func (app *application) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err := app.models.Users.Delete(u.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type oauthUserInfo struct {
 	Email     string
 	firstName string
