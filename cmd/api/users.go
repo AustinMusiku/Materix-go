@@ -339,6 +339,68 @@ func (app *application) getMyUserHandler(w http.ResponseWriter, r *http.Request)
 	w.Write(userJson)
 }
 
+func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	claims, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var input struct {
+		Name      *string `json:"name"`
+		Email     *string `json:"email"`
+		AvatarUrl *string `json:"avatar"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&input)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	u, err := app.models.Users.GetById(claims.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if input.Name != nil {
+		u.Name = *input.Name
+	}
+
+	if input.Email != nil {
+		u.Email = *input.Email
+	}
+
+	if input.AvatarUrl != nil {
+		u.AvatarUrl = *input.AvatarUrl
+	}
+
+	v := validator.New()
+	if data.ValidateUser(v, u); !v.Valid() {
+		http.Error(w, "failed validation", http.StatusUnprocessableEntity)
+		return
+	}
+
+	err = app.models.Users.Update(u)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			http.Error(w, "Edit conflict", http.StatusConflict)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	userJson, err := json.MarshalIndent(u, "", "\t")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	w.Write(userJson)
+}
+
 type oauthUserInfo struct {
 	Email     string
 	firstName string

@@ -193,7 +193,7 @@ func (u *UserModel) Update(user *User) error {
 		UPDATE users
 		SET name = $2, email = $3, avatar_url = $4, activated = $5, provider = $6, version = version+1, updated_at = now()
 		WHERE id = $1 AND version = $7
-		RETURNING id, uuid, created_at, updated_at, version`
+		RETURNING updated_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
@@ -208,13 +208,17 @@ func (u *UserModel) Update(user *User) error {
 		user.Version,
 	}
 
-	return u.db.QueryRowContext(ctx, query, args...).Scan(
-		&user.Id,
-		&user.Uuid,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-		&user.Version,
-	)
+	err := u.db.QueryRowContext(ctx, query, args...).Scan(&user.UpdatedAt, &user.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (u *UserModel) Delete(id int) error {
