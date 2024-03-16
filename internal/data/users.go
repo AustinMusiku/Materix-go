@@ -246,50 +246,6 @@ func (u *UserModel) Delete(id int) error {
 	return nil
 }
 
-func (u *UserModel) GetFriendsFor(id int) ([]*User, error) {
-	query := `
-		SELECT 
-			users.id, users.uuid, users.name, users.email, users.avatar_url
-		FROM friends
-		INNER JOIN users
-		ON 
-			(users.id = friends.source_user_id OR users.id = friends.destination_user_id) AND users.id != $1
-		WHERE 
-			(friends.source_user_id = $1 OR friends.destination_user_id = $1) AND friends.status = 'accepted'`
-
-	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
-	defer cancel()
-
-	rows, err := u.db.QueryContext(ctx, query, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var friends []*User
-
-	for rows.Next() {
-		var user User
-		err := rows.Scan(
-			&user.Id,
-			&user.Uuid,
-			&user.Name,
-			&user.Email,
-			&user.AvatarUrl,
-		)
-		if err != nil {
-			return nil, err
-		}
-		friends = append(friends, &user)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return friends, nil
-}
-
 func (p *password) Set(text string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(text), 12)
 	if err != nil {
