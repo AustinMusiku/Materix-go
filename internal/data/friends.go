@@ -148,6 +148,46 @@ func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
 	return friends, nil
 }
 
+func (fp *FriendPairModel) GetSentFor(id int) ([]*FriendRequest, error) {
+	query := `
+		SELECT id, source_user_id, destination_user_id, status, created_at 
+		FROM friends
+		WHERE source_user_id = $1 AND status = 'pending'`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	friendRequests := []*FriendRequest{}
+
+	rows, err := fp.db.QueryContext(ctx, query, id)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fr FriendRequest
+		err := rows.Scan(
+			&fr.Id,
+			&fr.SourceUserId,
+			&fr.DestinationUserId,
+			&fr.Status,
+			&fr.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		friendRequests = append(friendRequests, &fr)
+	}
+
+	return friendRequests, nil
+}
+
 // Reject
 // Get Accepted (Aka Get Friends For)
 // Get Pending (Aka Get Received Friend Requests)

@@ -102,3 +102,24 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	w.Write([]byte("Friend request accepted"))
 }
+
+func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	requests, err := app.models.Friends.GetSentFor(u.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	requestsJSON, err := json.MarshalIndent(requests, "", "\t")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(requestsJSON)
+}
