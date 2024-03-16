@@ -103,6 +103,44 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 	w.Write([]byte("Friend request accepted"))
 }
 
+func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	fRequestId, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	fRequest, err := app.models.Friends.GetRequest(fRequestId)
+	if err != nil {
+		switch err {
+		case data.ErrRecordNotFound:
+			http.Error(w, "Friend request not found", http.StatusNotFound)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Ensure only the source or destination user can cancel/reject the request
+	if u.Id != fRequest.DestinationUserId || u.Id != fRequest.SourceUserId {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err = app.models.Friends.Delete(fRequest)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("Friend request rejected"))
+}
+
 func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
