@@ -4,27 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"golang.org/x/crypto/bcrypt"
 )
 
-const QueryTimeout = 5 * time.Second
-
 var ErrDuplicateEmail = errors.New("email already exists")
 
 type User struct {
 	Id        int      `json:"id"`
-	Uuid      string   `json:"uuid"`
+	Uuid      string   `json:"uuid,omitempty"`
 	Name      string   `json:"user_name"`
 	Email     string   `json:"email"`
 	Password  password `json:"-"`
 	AvatarUrl string   `json:"avatar"`
-	Provider  string   `json:"provider"`
-	CreatedAt string   `json:"created_at"`
-	UpdatedAt string   `json:"updated_at"`
-	Activated bool     `json:"activated"`
+	Provider  string   `json:"provider,omitempty"`
+	CreatedAt string   `json:"created_at,omitempty"`
+	UpdatedAt string   `json:"updated_at,omitempty"`
+	Activated bool     `json:"activated,omitempty"`
 	Version   int      `json:"-"`
 }
 
