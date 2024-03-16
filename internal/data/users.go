@@ -13,7 +13,7 @@ var ErrDuplicateEmail = errors.New("email already exists")
 
 type User struct {
 	Id        int      `json:"id"`
-	Uuid      string   `json:"uuid"`
+	Uuid      string   `json:"uuid,omitempty"`
 	Name      string   `json:"user_name"`
 	Email     string   `json:"email"`
 	Password  password `json:"-"`
