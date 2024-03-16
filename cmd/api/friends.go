@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/AustinMusiku/Materix-go/internal/data"
+	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"github.com/go-chi/chi"
 )
 
@@ -46,13 +48,32 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = app.models.Friends.Insert(u.Id, input.Id)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	fRequest := &data.FriendRequest{
+		SourceUserId:      u.Id,
+		DestinationUserId: input.Id,
+		Status:            "pending",
+	}
+
+	v := validator.New()
+	if data.ValidateFriendPair(v, fRequest); !v.Valid() {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
+		w.Write(errors)
 		return
 	}
 
-	w.Write([]byte("Friend request sent"))
+	err = app.models.Friends.Insert(fRequest)
+	if err != nil {
+		switch err {
+		case data.ErrDuplicateFriendRequest:
+			http.Error(w, "Friend request already pending or accepted", http.StatusConflict)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Write([]byte(fmt.Sprintf("Friend request sent with id %d", fRequest.Id)))
 }
 
 func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {

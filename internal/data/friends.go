@@ -3,7 +3,12 @@ package data
 import (
 	"context"
 	"database/sql"
+	"errors"
+
+	"github.com/AustinMusiku/Materix-go/internal/validator"
 )
+
+var ErrDuplicateFriendRequest = errors.New("friend request already pending or accepted")
 
 type FriendRequest struct {
 	Id                int    `json:"id"`
@@ -46,17 +51,28 @@ func (fp *FriendPairModel) GetRequest(friendRequestId int) (*FriendRequest, erro
 	return &f, nil
 }
 
-func (fp *FriendPairModel) Insert(sourceUserId int, destinationId int) error {
+func (fp *FriendPairModel) Insert(friendRequest *FriendRequest) error {
 	query := `
 		INSERT INTO friends (source_user_id, destination_user_id, status)
-		VALUES ($1, $2, 'pending')`
+		VALUES ($1, $2, $3)
+		RETURNING id, created_at, updated_at, version`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	_, err := fp.db.ExecContext(ctx, query, sourceUserId, destinationId)
+	err := fp.db.QueryRowContext(ctx, query, friendRequest.SourceUserId, friendRequest.DestinationUserId, friendRequest.Status).Scan(
+		&friendRequest.Id,
+		&friendRequest.CreatedAt,
+		&friendRequest.UpdatedAt,
+		&friendRequest.Version,
+	)
 	if err != nil {
-		return err
+		switch {
+		case err.Error() == `pq: duplicate key value violates unique constraint "unique_friendship_pair"`:
+			return ErrDuplicateFriendRequest
+		default:
+			return err
+		}
 	}
 
 	return nil
@@ -138,3 +154,10 @@ func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
 // Get Sent (Aka Get Sent Friend Requests)
 // Delete
 // Get Friends For
+
+func ValidateFriendPair(v *validator.Validator, friendRequest *FriendRequest) {
+	v.Check(friendRequest.SourceUserId > 0, "source_user_id", "must be valid")
+	v.Check(friendRequest.DestinationUserId > 0, "destination_user_id", "must be valid")
+	v.Check(friendRequest.SourceUserId != friendRequest.DestinationUserId, "destination_user_id", "cannot send friend request to self")
+	v.Check(friendRequest.Status == "pending", "status", "must be pending")
+}
