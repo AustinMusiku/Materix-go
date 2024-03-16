@@ -82,6 +82,40 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 	return freetime, nil
 }
 
+func (ft *FreeTimeModel) Get(freetimeId int) (*FreeTime, error) {
+	query := `
+		SELECT id, user_id, start_time, end_time, created_at, updated_at, tags, visibility, version
+		FROM free_times
+		WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	var freetime FreeTime
+
+	err := ft.db.QueryRowContext(ctx, query, freetimeId).Scan(
+		&freetime.ID,
+		&freetime.UserID,
+		&freetime.StartTime,
+		&freetime.EndTime,
+		&freetime.CreatedAt,
+		&freetime.UpdatedAt,
+		pq.Array(&freetime.Tags),
+		&freetime.Visibility,
+		&freetime.Version,
+	)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &freetime, nil
+}
+
 func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
 	query := `
 		SELECT id, user_id, start_time, end_time, created_at, updated_at, tags, visibility
@@ -126,10 +160,38 @@ func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
 	return freetimes, nil
 }
 
-//	func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
-//		return freetime, nil
-//	}
-//
+func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
+	query := `
+		UPDATE free_times
+		SET start_time = $1, end_time = $2, tags = $3, visibility = $4, updated_at = now(), version = version + 1
+		WHERE id = $5 AND version = $6
+		RETURNING version`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	args := []interface{}{
+		freetime.StartTime,
+		freetime.EndTime,
+		pq.Array(freetime.Tags),
+		freetime.Visibility,
+		freetime.ID,
+		freetime.Version,
+	}
+
+	err := ft.db.QueryRowContext(ctx, query, args...).Scan(&freetime.Version)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return freetime, nil
+}
+
 //	func (ft *FreeTimeModel) Delete(freetime *FreeTime) (*FreeTime, error) {
 //		return freetime, nil
 //	}
