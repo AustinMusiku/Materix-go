@@ -123,3 +123,24 @@ func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *h
 
 	w.Write(requestsJSON)
 }
+
+func (app *application) getReceivedFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	requests, err := app.models.Friends.GetReceivedFor(u.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	requestsJSON, err := json.MarshalIndent(requests, "", "\t")
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(requestsJSON)
+}
