@@ -4,13 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"golang.org/x/crypto/bcrypt"
 )
-
-const QueryTimeout = 5 * time.Second
 
 var ErrDuplicateEmail = errors.New("email already exists")
 
