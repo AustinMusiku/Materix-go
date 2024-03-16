@@ -136,3 +136,41 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 
 	json.NewEncoder(w).Encode(updatedFreetime)
 }
+
+func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	ft, err := app.models.FreeTimes.Get(id)
+	if err != nil {
+		switch err {
+		case data.ErrRecordNotFound:
+			http.Error(w, "Not found", http.StatusNotFound)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if ft.UserID != u.Id {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	err = app.models.FreeTimes.Delete(ft)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write([]byte("OK"))
+}

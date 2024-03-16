@@ -192,9 +192,22 @@ func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
 	return freetime, nil
 }
 
-//	func (ft *FreeTimeModel) Delete(freetime *FreeTime) (*FreeTime, error) {
-//		return freetime, nil
-//	}
+func (ft *FreeTimeModel) Delete(freetime *FreeTime) error {
+	query := `
+		DELETE FROM free_times
+		WHERE id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	_, err := ft.db.ExecContext(ctx, query, freetime.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func ValidateFreeTime(v *validator.Validator, freetime *FreeTime) bool {
 	v.Check(freetime.UserID > 0, "user_id", "must be valid")
 	v.Check(freetime.StartTime.After(time.Now()), "start_time", "must be in the future")
