@@ -12,12 +12,18 @@ var ErrDuplicateFriendRequest = errors.New("friend request already pending or ac
 
 type FriendRequest struct {
 	Id                int    `json:"id"`
-	SourceUserId      int    `json:"source_user_id"`
-	DestinationUserId int    `json:"destination_user_id"`
+	SourceUserId      int    `json:"source_user_id,omitempty"`
+	DestinationUserId int    `json:"destination_user_id,omitempty"`
 	Status            string `json:"status"`
 	CreatedAt         string `json:"created_at,omitempty"`
 	UpdatedAt         string `json:"updated_at,omitempty"`
 	Version           int    `json:"version,omitempty"`
+}
+
+type DetailedFriendRequest struct {
+	SourceUser      *User          `json:"source_user,omitempty"`
+	DestinationUser *User          `json:"destination_user,omitempty"`
+	RequestDetails  *FriendRequest `json:"request_details,omitempty"`
 }
 
 type FriendPairModel struct {
@@ -148,16 +154,18 @@ func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
 	return friends, nil
 }
 
-func (fp *FriendPairModel) GetSentFor(id int) ([]*FriendRequest, error) {
+func (fp *FriendPairModel) GetSentFor(id int) ([]*DetailedFriendRequest, error) {
 	query := `
-		SELECT id, source_user_id, destination_user_id, status, created_at 
+		SELECT friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
 		FROM friends
+		INNER JOIN users
+		ON users.id = friends.destination_user_id
 		WHERE source_user_id = $1 AND status = 'pending'`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	friendRequests := []*FriendRequest{}
+	friendRequests := []*DetailedFriendRequest{}
 
 	rows, err := fp.db.QueryContext(ctx, query, id)
 	if err != nil {
@@ -171,33 +179,45 @@ func (fp *FriendPairModel) GetSentFor(id int) ([]*FriendRequest, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var du User
 		var fr FriendRequest
 		err := rows.Scan(
 			&fr.Id,
-			&fr.SourceUserId,
-			&fr.DestinationUserId,
+			&du.Id,
+			&du.Name,
+			&du.Email,
+			&du.AvatarUrl,
 			&fr.Status,
 			&fr.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
-		friendRequests = append(friendRequests, &fr)
+		friendRequests = append(friendRequests, &DetailedFriendRequest{
+			DestinationUser: &du,
+			RequestDetails: &FriendRequest{
+				Id:        fr.Id,
+				Status:    fr.Status,
+				CreatedAt: fr.CreatedAt,
+			},
+		})
 	}
 
 	return friendRequests, nil
 }
 
-func (fp *FriendPairModel) GetReceivedFor(id int) ([]*FriendRequest, error) {
+func (fp *FriendPairModel) GetReceivedFor(id int) ([]*DetailedFriendRequest, error) {
 	query := `
-		SELECT id, source_user_id, destination_user_id, status, created_at 
+		SELECT friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
 		FROM friends
+		INNER JOIN users
+		ON users.id = friends.source_user_id
 		WHERE destination_user_id = $1 AND status = 'pending'`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	friendRequests := []*FriendRequest{}
+	friendRequests := []*DetailedFriendRequest{}
 
 	rows, err := fp.db.QueryContext(ctx, query, id)
 	if err != nil {
@@ -211,18 +231,28 @@ func (fp *FriendPairModel) GetReceivedFor(id int) ([]*FriendRequest, error) {
 	defer rows.Close()
 
 	for rows.Next() {
+		var su User
 		var fr FriendRequest
 		err := rows.Scan(
 			&fr.Id,
-			&fr.SourceUserId,
-			&fr.DestinationUserId,
+			&su.Id,
+			&su.Name,
+			&su.Email,
+			&su.AvatarUrl,
 			&fr.Status,
 			&fr.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
-		friendRequests = append(friendRequests, &fr)
+		friendRequests = append(friendRequests, &DetailedFriendRequest{
+			SourceUser: &su,
+			RequestDetails: &FriendRequest{
+				Id:        fr.Id,
+				Status:    fr.Status,
+				CreatedAt: fr.CreatedAt,
+			},
+		})
 	}
 
 	return friendRequests, nil
