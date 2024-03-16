@@ -47,10 +47,25 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 
 	insertedFreetime, err := app.models.FreeTimes.Insert(&ft, input.Viewers)
 	if err != nil {
-		app.logger.Error(err, nil)
-		http.Error(w, "Internal server error: Failed to insert into store", http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	json.NewEncoder(w).Encode(insertedFreetime)
+}
+
+func (app *application) getMyFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	freeTimes, err := app.models.FreeTimes.GetAllFor(u.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(freeTimes)
 }

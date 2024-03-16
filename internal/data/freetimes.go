@@ -82,10 +82,50 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 	return freetime, nil
 }
 
-//	func (ft *FreeTimeModel) Get(freetimeId int) (*FreeTime, error) {
-//		return freetime, nil
-//	}
-//
+func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
+	query := `
+		SELECT id, user_id, start_time, end_time, created_at, updated_at, tags, visibility
+		FROM free_times
+		WHERE user_id = $1`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	rows, err := ft.db.QueryContext(ctx, query, userId)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	var freetimes []*FreeTime
+
+	for rows.Next() {
+		var ft FreeTime
+		err = rows.Scan(
+			&ft.ID,
+			&ft.UserID,
+			&ft.StartTime,
+			&ft.EndTime,
+			&ft.CreatedAt,
+			&ft.UpdatedAt,
+			pq.Array(&ft.Tags),
+			&ft.Visibility,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		freetimes = append(freetimes, &ft)
+	}
+
+	return freetimes, nil
+}
+
 //	func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
 //		return freetime, nil
 //	}
