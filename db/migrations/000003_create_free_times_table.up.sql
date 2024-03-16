@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS free_times (
     created_at TIMESTAMP(0) with time zone DEFAULT now(),
     updated_at TIMESTAMP(0) with time zone DEFAULT now(),
     tags TEXT[] NOT NULL DEFAULT '{}',
-    visibility VARCHAR(10) NOT NULL, -- 'public' or 'private'
+    visibility VARCHAR(10) DEFAULT 'public',
     version INTEGER NOT NULL DEFAULT 1,
 
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
