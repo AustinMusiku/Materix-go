@@ -144,3 +144,40 @@ func (app *application) getReceivedFriendRequestsHandler(w http.ResponseWriter, 
 
 	w.Write(requestsJSON)
 }
+
+func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+
+	fId, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	friendship, err := app.models.Friends.GetFriend(u.Id, fId)
+	if err != nil {
+		switch err {
+		case data.ErrRecordNotFound:
+			http.Error(w, "Friend not found", http.StatusNotFound)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	err = app.models.Friends.Delete(friendship)
+	if err != nil {
+		switch err {
+		case data.ErrEditConflict:
+			http.Error(w, "Edit conflict", http.StatusConflict)
+		default:
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Write([]byte("Friend removed"))
+}

@@ -110,6 +110,41 @@ func (fp *FriendPairModel) Accept(friendRequest *FriendRequest) error {
 	return nil
 }
 
+func (fp *FriendPairModel) GetFriend(id, friendId int) (*FriendRequest, error) {
+	query := `
+		SELECT id, source_user_id, destination_user_id, status, created_at, updated_at, version
+		FROM friends
+		WHERE 
+			(friends.source_user_id = $1 AND friends.destination_user_id = $2) 
+				OR 
+			(friends.source_user_id = $2 AND friends.destination_user_id = $1)`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	var friend FriendRequest
+
+	err := fp.db.QueryRowContext(ctx, query, id, friendId).Scan(
+		&friend.Id,
+		&friend.SourceUserId,
+		&friend.DestinationUserId,
+		&friend.Status,
+		&friend.CreatedAt,
+		&friend.UpdatedAt,
+		&friend.Version,
+	)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &friend, nil
+}
+
 func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
 	query := `
 		SELECT 
@@ -256,6 +291,31 @@ func (fp *FriendPairModel) GetReceivedFor(id int) ([]*DetailedFriendRequest, err
 	}
 
 	return friendRequests, nil
+}
+
+func (fp *FriendPairModel) Delete(friendRequest *FriendRequest) error {
+	query := `
+		DELETE FROM friends
+		WHERE id = $1 AND version = $2`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	result, err := fp.db.ExecContext(ctx, query, friendRequest.Id, friendRequest.Version)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrEditConflict
+	}
+
+	return nil
 }
 
 // Reject
