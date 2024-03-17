@@ -33,7 +33,7 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	ft := data.FreeTime{
-		UserID:     u.Id,
+		UserId:     u.Id,
 		StartTime:  input.StartTime,
 		EndTime:    input.EndTime,
 		Tags:       input.Tags,
@@ -104,7 +104,7 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if ft.UserID != u.Id {
+	if ft.UserId != u.Id {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -161,7 +161,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if ft.UserID != u.Id {
+	if ft.UserId != u.Id {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}

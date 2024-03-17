@@ -10,8 +10,8 @@ import (
 )
 
 type FreeTime struct {
-	ID         int       `json:"id"`
-	UserID     int       `json:"user_id"`
+	Id         int       `json:"id"`
+	UserId     int       `json:"user_id"`
 	StartTime  time.Time `json:"start_time"`
 	EndTime    time.Time `json:"end_time"`
 	CreatedAt  time.Time `json:"created_at,omitempty"`
@@ -39,7 +39,7 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 	defer cancel()
 
 	args := []interface{}{
-		freetime.UserID,
+		freetime.UserId,
 		freetime.StartTime,
 		freetime.EndTime,
 		pq.Array(freetime.Tags),
@@ -52,7 +52,7 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 	}
 
 	err = tx.QueryRowContext(ctx, insertFreetimeQuery, args...).Scan(
-		&freetime.ID,
+		&freetime.Id,
 		&freetime.CreatedAt,
 		&freetime.UpdatedAt,
 		&freetime.Version,
@@ -67,7 +67,7 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 			VALUES ($1, $2)`
 
 	for _, viewerID := range viewers {
-		_, err = tx.ExecContext(ctx, insertViewerQuery, freetime.ID, viewerID)
+		_, err = tx.ExecContext(ctx, insertViewerQuery, freetime.Id, viewerID)
 		if err != nil {
 			tx.Rollback()
 			return nil, err
@@ -94,8 +94,8 @@ func (ft *FreeTimeModel) Get(freetimeId int) (*FreeTime, error) {
 	var freetime FreeTime
 
 	err := ft.db.QueryRowContext(ctx, query, freetimeId).Scan(
-		&freetime.ID,
-		&freetime.UserID,
+		&freetime.Id,
+		&freetime.UserId,
 		&freetime.StartTime,
 		&freetime.EndTime,
 		&freetime.CreatedAt,
@@ -141,8 +141,8 @@ func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
 	for rows.Next() {
 		var ft FreeTime
 		err = rows.Scan(
-			&ft.ID,
-			&ft.UserID,
+			&ft.Id,
+			&ft.UserId,
 			&ft.StartTime,
 			&ft.EndTime,
 			&ft.CreatedAt,
@@ -175,7 +175,7 @@ func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
 		freetime.EndTime,
 		pq.Array(freetime.Tags),
 		freetime.Visibility,
-		freetime.ID,
+		freetime.Id,
 		freetime.Version,
 	}
 
@@ -200,7 +200,7 @@ func (ft *FreeTimeModel) Delete(freetime *FreeTime) error {
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	_, err := ft.db.ExecContext(ctx, query, freetime.ID)
+	_, err := ft.db.ExecContext(ctx, query, freetime.Id)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, erro
 }
 
 func ValidateFreeTime(v *validator.Validator, freetime *FreeTime) bool {
-	v.Check(freetime.UserID > 0, "user_id", "must be valid")
+	v.Check(freetime.UserId > 0, "user_id", "must be valid")
 	v.Check(freetime.StartTime.After(time.Now()), "start_time", "must be in the future")
 	v.Check(freetime.StartTime.Before(freetime.EndTime), "end_time", "must be after start time")
 	v.Check(freetime.Visibility == "public" || freetime.Visibility == "private", "visibility", "must be either public or private")
