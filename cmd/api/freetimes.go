@@ -174,3 +174,19 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 
 	w.Write([]byte("OK"))
 }
+
+func (app *application) getMyFriendsFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	freeTimes, err := app.models.FreeTimes.GetAllForFriendsOf(u.Id)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(freeTimes)
+}

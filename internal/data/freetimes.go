@@ -208,6 +208,77 @@ func (ft *FreeTimeModel) Delete(freetime *FreeTime) error {
 	return nil
 }
 
+type FriendFreeTime struct {
+	FreetimeId      int       `json:"id"`
+	FriendId        int       `json:"user_id"`
+	FriendName      string    `json:"name"`
+	FriendEmail     string    `json:"email"`
+	FriendAvatarUrl string    `json:"avatar_url"`
+	StartTime       time.Time `json:"start_time"`
+	EndTime         time.Time `json:"end_time"`
+	Tags            []string  `json:"tags"`
+}
+
+func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, error) {
+	query := `
+		SELECT 
+			ft.id as free_time_id, 
+			u.id as friend_id, 
+			u.name as friend_name, 
+			u.email as friend_email,
+			u.avatar_url,
+			ft.start_time, 
+			ft.end_time, 
+			ft.tags
+		FROM free_times ft
+		INNER JOIN friends f 
+		ON 
+			(ft.user_id = f.source_user_id AND f.destination_user_id = $1)
+			OR
+			(ft.user_id = f.destination_user_id AND f.source_user_id = $1)
+		INNER JOIN users u
+		ON (ft.user_id = u.id)
+		WHERE (f.source_user_id = $1 OR f.destination_user_id = $1)
+		AND f.status = 'accepted'`
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	rows, err := ft.db.QueryContext(ctx, query, userId)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	defer rows.Close()
+
+	freetimes := []*FriendFreeTime{}
+
+	for rows.Next() {
+		var ft FriendFreeTime
+		err = rows.Scan(
+			&ft.FreetimeId,
+			&ft.FriendId,
+			&ft.FriendName,
+			&ft.FriendEmail,
+			&ft.FriendAvatarUrl,
+			&ft.StartTime,
+			&ft.EndTime,
+			pq.Array(&ft.Tags),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		freetimes = append(freetimes, &ft)
+	}
+
+	return freetimes, nil
+}
+
 func ValidateFreeTime(v *validator.Validator, freetime *FreeTime) bool {
 	v.Check(freetime.UserID > 0, "user_id", "must be valid")
 	v.Check(freetime.StartTime.After(time.Now()), "start_time", "must be in the future")

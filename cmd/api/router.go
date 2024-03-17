@@ -52,7 +52,7 @@ func (app *application) initRouter() *chi.Mux {
 			r.Patch("/free/{id}", app.updateFreeTimeHandler)
 			r.Delete("/free/{id}", app.removeFreeTimeHandler)
 
-			// r.Get("/friends/free", app.getMyFriendsFreeTimesHandler)
+			r.Get("/friends/free", app.getMyFriendsFreeTimesHandler)
 			// r.Get("/friends/free/{id}", app.getFriendFreeTimesHandler)
 		})
 	})
