@@ -190,3 +190,31 @@ func (app *application) getMyFriendsFreeTimesHandler(w http.ResponseWriter, r *h
 
 	json.NewEncoder(w).Encode(freeTimes)
 }
+
+func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	friendId, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	_, err = app.models.Friends.GetFriend(u.Id, friendId)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+
+	freeTimes, err := app.models.FreeTimes.GetAllFor(friendId)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(freeTimes)
+}
