@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -14,28 +13,24 @@ import (
 func (app *application) getMyFriendsHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	friends, err := app.models.Friends.GetFriendsFor(u.Id)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	friendsJSON, err := json.MarshalIndent(friends, "", "\t")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(friendsJSON)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"friends": friends}, nil)
 }
 
 func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	var input struct {
@@ -44,7 +39,7 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
@@ -56,9 +51,8 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 
 	v := validator.New()
 	if data.ValidateFriendPair(v, fRequest); !v.Valid() {
-		w.WriteHeader(http.StatusUnprocessableEntity)
 		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
-		w.Write(errors)
+		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": "Invalid friend request", "errors": errors}, nil)
 		return
 	}
 
@@ -66,20 +60,20 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 	if err != nil {
 		switch err {
 		case data.ErrDuplicateFriendRequest:
-			http.Error(w, "Friend request already pending or accepted", http.StatusConflict)
+			app.writeJSON(w, http.StatusConflict, ResponseWrapper{"error": "Friend request already sent"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
-	w.Write([]byte(fmt.Sprintf("Friend request sent with id %d", fRequest.Id)))
+	app.writeJSON(w, http.StatusCreated, ResponseWrapper{"message": "Friend request sent"}, nil)
 }
 
 func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	fRequestId, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
@@ -87,31 +81,32 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			http.Error(w, "Friend request not found", http.StatusNotFound)
+			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Friend request not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
 	err = app.models.Friends.Accept(fRequest)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	w.Write([]byte("Friend request accepted"))
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Friend request accepted"}, nil)
 }
 
 func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	fRequestId, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
@@ -119,79 +114,70 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			http.Error(w, "Friend request not found", http.StatusNotFound)
+			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Friend request not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
 	// Ensure only the source or destination user can cancel/reject the request
 	if u.Id != fRequest.DestinationUserId || u.Id != fRequest.SourceUserId {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		app.writeJSON(w, http.StatusForbidden, ResponseWrapper{"error": "Forbidden"}, nil)
 		return
 	}
 
 	err = app.models.Friends.Delete(fRequest)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	w.Write([]byte("Friend request rejected"))
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Friend request rejected"}, nil)
 }
 
 func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	requests, err := app.models.Friends.GetSentFor(u.Id)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	requestsJSON, err := json.MarshalIndent(requests, "", "\t")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(requestsJSON)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"requests": requests}, nil)
 }
 
 func (app *application) getReceivedFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	requests, err := app.models.Friends.GetReceivedFor(u.Id)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	requestsJSON, err := json.MarshalIndent(requests, "", "\t")
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Write(requestsJSON)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"requests": requests}, nil)
 }
 
 func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		return
 	}
 
 	fId, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
@@ -199,9 +185,9 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			http.Error(w, "Friend not found", http.StatusNotFound)
+			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Friend not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
@@ -210,12 +196,12 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		switch err {
 		case data.ErrEditConflict:
-			http.Error(w, "Edit conflict", http.StatusConflict)
+			app.writeJSON(w, http.StatusConflict, ResponseWrapper{"error": "Friend not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
-	w.Write([]byte("Friend removed"))
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Friend removed"}, nil)
 }
