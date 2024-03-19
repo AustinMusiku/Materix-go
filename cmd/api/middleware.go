@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,7 +51,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		if err != nil {
 			switch err {
 			case data.ErrRecordNotFound:
-				app.notFoundResponse(w, r)
+				app.notFoundResponse(w, r, errors.New("user not found"))
 			default:
 				app.serverErrorResponse(w, r, err)
 			}
