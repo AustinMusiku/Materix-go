@@ -109,7 +109,7 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("free time not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -117,7 +117,7 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if ft.UserId != u.Id {
-		app.notFoundResponse(w, r)
+		app.notFoundResponse(w, r, errors.New("free time not found for user"))
 		return
 	}
 
@@ -174,7 +174,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("free time not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -182,7 +182,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if ft.UserId != u.Id {
-		app.notFoundResponse(w, r)
+		app.notFoundResponse(w, r, errors.New("free time not found for user"))
 		return
 	}
 
@@ -240,7 +240,7 @@ func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("friend not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}

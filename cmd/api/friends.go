@@ -94,7 +94,7 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("friend request not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -136,7 +136,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("friend request not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -145,7 +145,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	// Ensure only the source or destination user can cancel/reject the request
 	if u.Id != fRequest.DestinationUserId || u.Id != fRequest.SourceUserId {
-		app.notFoundResponse(w, r)
+		app.notFoundResponse(w, r, errors.New("friend request not found for user"))
 		return
 	}
 
@@ -222,7 +222,7 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("friend not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -233,7 +233,7 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		switch err {
 		case data.ErrEditConflict:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("friend not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}

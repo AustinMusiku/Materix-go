@@ -28,7 +28,7 @@ func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -52,7 +52,7 @@ func (app *application) getMyUserHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
@@ -88,7 +88,7 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.notFoundResponse(w, r)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
