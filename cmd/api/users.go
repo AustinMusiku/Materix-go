@@ -14,13 +14,13 @@ import (
 func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
+		app.badRequestResponse(w, r, errors.New("missing or invalid user id"))
 		return
 	}
 
 	i, err := strconv.Atoi(id)
 	if err != nil {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -28,20 +28,23 @@ func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "User not found"}, nil)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
-			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	app.writeJSON(w, http.StatusOK, ResponseWrapper{"user": u}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"user": u}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) getMyUserHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, errors.New("context missing user value"))
 		return
 	}
 
@@ -49,20 +52,23 @@ func (app *application) getMyUserHandler(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "User not found"}, nil)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
-			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
-	app.writeJSON(w, http.StatusOK, ResponseWrapper{"user": user}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"user": user}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request) {
 	claims, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, errors.New("context missing user value"))
 		return
 	}
 
@@ -74,7 +80,7 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Invalid request body"}, nil)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -82,9 +88,9 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "User not found"}, nil)
+			app.notFoundResponse(w, r, errors.New("user not found"))
 		default:
-			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -103,7 +109,7 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 
 	v := validator.New()
 	if data.ValidateUser(v, u); !v.Valid() {
-		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": v.Errors}, nil)
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
@@ -111,9 +117,9 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			app.writeJSON(w, http.StatusConflict, ResponseWrapper{"error": "Edit conflict"}, nil)
+			app.editConflictResponse(w, r)
 		default:
-			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
@@ -124,15 +130,18 @@ func (app *application) updateUserHandler(w http.ResponseWriter, r *http.Request
 func (app *application) deleteUserHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, errors.New("context missing user value"))
 		return
 	}
 
 	err := app.models.Users.Delete(u.Id)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"status": "success"}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }

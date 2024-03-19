@@ -31,7 +31,7 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Invalid request body"}, nil)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -45,45 +45,38 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 	err = u.Password.Set(input.Password)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	// Validate user details
 	v := validator.New()
 	if data.ValidateUser(v, &u); !v.Valid() {
-		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
-		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": string(errors)}, nil)
+		app.failedValidationResponse(w, r, v.Errors)
 	}
 
 	// Save user in database
 	err = app.models.Users.Insert(&u)
 	if err != nil {
-		var (
-			code int
-			msg  string
-		)
 		switch {
 		case errors.Is(err, data.ErrDuplicateEmail):
-			code = http.StatusUnprocessableEntity
-			msg = "A user with this email already exists"
+			v.AddError("email", "a user with this email address already exists")
+			app.failedValidationResponse(w, r, v.Errors)
 		default:
-			code = http.StatusInternalServerError
-			msg = "Internal server error"
+			app.serverErrorResponse(w, r, err)
 		}
-		app.writeJSON(w, code, ResponseWrapper{"error": msg}, nil)
 		return
 	}
 
 	tokens, err := data.NewTokenPair(u)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	err = app.writeJSON(w, http.StatusCreated, ResponseWrapper{"tokens": tokens}, nil)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.serverErrorResponse(w, r, err)
 	}
 }
 
@@ -95,7 +88,7 @@ func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.R
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Invalid request body"}, nil)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -103,43 +96,39 @@ func (app *application) authenticateUserHandler(w http.ResponseWriter, r *http.R
 	data.ValidateEmail(v, input.Email)
 	data.ValidatePasswordPlaintext(v, input.Password)
 	if !v.Valid() {
-		errors, _ := json.MarshalIndent(v.Errors, "", "\t")
-		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": string(errors)}, nil)
+		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
 
 	u, err := app.models.Users.GetByEmail(input.Email)
 	if err != nil {
 		if errors.Is(err, data.ErrRecordNotFound) {
-			app.writeJSON(w, http.StatusUnauthorized, ResponseWrapper{"error": "Invalid email or password"}, nil)
+			app.invalidCredentialsResponse(w, r)
 			return
 		}
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	if ok, err := u.Password.Compare(input.Password); !ok {
 		if err == nil {
-			app.writeJSON(w, http.StatusUnauthorized, ResponseWrapper{"error": "Invalid email or password"}, nil)
+			app.invalidCredentialsResponse(w, r)
 		} else {
-			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+			app.serverErrorResponse(w, r, err)
 		}
 		return
 	}
 
 	tokens, err := data.NewTokenPair(*u)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	jwts, err := json.MarshalIndent(tokens, "", "\t")
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"tokens": tokens}, nil)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
-		return
+		app.serverErrorResponse(w, r, err)
 	}
-
-	app.writeJSON(w, http.StatusOK, ResponseWrapper{"tokens": jwts}, nil)
 }
 
 func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +143,7 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 
 	// Verify state
 	if state != os.Getenv("OAUTH2_CALLBACK_STATE") {
-		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Invalid state"}, nil)
+		app.badRequestResponse(w, r, errors.New("invalid state"))
 		return
 	}
 
@@ -175,7 +164,7 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 	authTokenUrl := fmt.Sprintf("%s?client_id=%s&client_secret=%s&code=%s&redirect_uri=%s&grant_type=authorization_code", baseAccessTokenUrl, clientId, clientSecret, code, redirect_uri)
 	req, err := http.NewRequest("POST", authTokenUrl, nil)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 	req.Header.Set("Accept", "application/json")
@@ -185,7 +174,7 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 	defer res.Body.Close()
@@ -196,14 +185,14 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 	}{}
 	err = json.NewDecoder(res.Body).Decode(&token)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
 	// Extract user info from provider api
 	userInfo, err := extractOauthUser(token.Access_token, oauthProvider)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
@@ -222,30 +211,28 @@ func (app *application) oauthCallbackHandler(w http.ResponseWriter, r *http.Requ
 		// Save user in database
 		err = app.models.Users.Insert(u)
 		if err != nil {
-			var (
-				code int
-				msg  string
-			)
 			switch {
 			case errors.Is(err, data.ErrDuplicateEmail):
-				code = http.StatusUnprocessableEntity
-				msg = "A user with this email already exists"
+				v := validator.New()
+				v.AddError("email", "a user with this email address already exists")
+				app.failedValidationResponse(w, r, v.Errors)
 			default:
-				code = http.StatusInternalServerError
-				msg = "Internal server error"
+				app.serverErrorResponse(w, r, err)
 			}
-			app.writeJSON(w, code, ResponseWrapper{"error": msg}, nil)
 			return
 		}
 	}
 
 	tokens, err := data.NewTokenPair(*u)
 	if err != nil {
-		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
+		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	app.writeJSON(w, http.StatusOK, ResponseWrapper{"tokens": tokens}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"tokens": tokens}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
 }
 
 func extractOauthUser(accessToken string, provider string) (oauthUserInfo, error) {

@@ -23,26 +23,26 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		}
 
 		if len(bearer) < 8 || strings.ToUpper(bearer[0:6]) != "BEARER" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
 		token := bearer[7:]
 		claims, err := data.ParseAccessToken(token)
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
 		ok, err := claims.Verify()
 		if err != nil || !ok {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
 		id, err := strconv.Atoi(claims.Sub)
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
@@ -50,9 +50,9 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		if err != nil {
 			switch err {
 			case data.ErrRecordNotFound:
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				app.notFoundResponse(w, r)
 			default:
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				app.serverErrorResponse(w, r, err)
 			}
 			return
 		}
@@ -66,7 +66,7 @@ func (app *application) requireAuthentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, ok := r.Context().Value(userContextKey).(*data.User)
 		if !ok || u.CreatedAt == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			app.authenticationRequiredResponse(w, r)
 			return
 		}
 		next.ServeHTTP(w, r)
