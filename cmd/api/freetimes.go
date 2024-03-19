@@ -14,7 +14,7 @@ import (
 func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
@@ -28,7 +28,7 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
 		return
 	}
 
@@ -43,45 +43,45 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 	v := validator.New()
 	if valid := data.ValidateFreeTime(v, &ft); !valid {
 		errors, _ := json.Marshal(v.Errors)
-		http.Error(w, string(errors), http.StatusUnprocessableEntity)
+		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": "Invalid free time", "errors": errors}, nil)
 		return
 	}
 
 	insertedFreetime, err := app.models.FreeTimes.Insert(&ft, input.Viewers)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	json.NewEncoder(w).Encode(insertedFreetime)
+	app.writeJSON(w, http.StatusCreated, ResponseWrapper{"freetime": insertedFreetime}, nil)
 }
 
 func (app *application) getMyFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
 	freeTimes, err := app.models.FreeTimes.GetAllFor(u.Id)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	json.NewEncoder(w).Encode(freeTimes)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
 }
 
 func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
 		return
 	}
 
@@ -97,15 +97,15 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			http.Error(w, "Not found", http.StatusNotFound)
+			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Free time not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
 	if ft.UserId != u.Id {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		app.writeJSON(w, http.StatusForbidden, ResponseWrapper{"error": "Forbidden"}, nil)
 		return
 	}
 
@@ -124,29 +124,29 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	v := validator.New()
 	if valid := data.ValidateFreeTime(v, ft); !valid {
 		errors, _ := json.Marshal(v.Errors)
-		http.Error(w, string(errors), http.StatusUnprocessableEntity)
+		app.writeJSON(w, http.StatusUnprocessableEntity, ResponseWrapper{"error": "Invalid free time", "errors": errors}, nil)
 		return
 	}
 
 	updatedFreetime, err := app.models.FreeTimes.Update(ft)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	json.NewEncoder(w).Encode(updatedFreetime)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetime": updatedFreetime}, nil)
 }
 
 func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
 		return
 	}
 
@@ -154,67 +154,67 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		switch err {
 		case data.ErrRecordNotFound:
-			http.Error(w, "Not found", http.StatusNotFound)
+			app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Free time not found"}, nil)
 		default:
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		}
 		return
 	}
 
 	if ft.UserId != u.Id {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		app.writeJSON(w, http.StatusForbidden, ResponseWrapper{"error": "Forbidden"}, nil)
 		return
 	}
 
 	err = app.models.FreeTimes.Delete(ft)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	w.Write([]byte("OK"))
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Free time removed"}, nil)
 }
 
 func (app *application) getMyFriendsFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
 	freeTimes, err := app.models.FreeTimes.GetAllForFriendsOf(u.Id)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	json.NewEncoder(w).Encode(freeTimes)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
 }
 
 func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http.Request) {
 	u, ok := r.Context().Value(userContextKey).(*data.User)
 	if !ok {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
 	friendId, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		app.writeJSON(w, http.StatusBadRequest, ResponseWrapper{"error": "Bad request"}, nil)
 		return
 	}
 
 	_, err = app.models.Friends.GetFriend(u.Id, friendId)
 	if err != nil {
-		http.Error(w, "Not found", http.StatusNotFound)
+		app.writeJSON(w, http.StatusNotFound, ResponseWrapper{"error": "Free time not found"}, nil)
 		return
 	}
 
 	freeTimes, err := app.models.FreeTimes.GetAllFor(friendId)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		app.writeJSON(w, http.StatusInternalServerError, ResponseWrapper{"error": "Internal server error"}, nil)
 		return
 	}
 
-	json.NewEncoder(w).Encode(freeTimes)
+	app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
 }
