@@ -92,7 +92,7 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 
 	fid, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -169,7 +169,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 
 	fid, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -235,7 +235,7 @@ func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http
 
 	friendId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 

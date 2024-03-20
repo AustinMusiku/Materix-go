@@ -85,7 +85,7 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -127,7 +127,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -213,7 +213,7 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 
 	fId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
