@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -27,7 +26,7 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 		Viewers    []int     `json:"viewers"`
 	}{}
 
-	err := json.NewDecoder(r.Body).Decode(&input)
+	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -103,7 +102,11 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 		Tags      *[]string  `json:"tags"`
 	}
 
-	json.NewDecoder(r.Body).Decode(&input)
+	err = app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
 
 	ft, err := app.models.FreeTimes.Get(fid)
 	if err != nil {
