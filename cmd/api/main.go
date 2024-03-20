@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/data"
@@ -34,6 +38,7 @@ type application struct {
 	config config
 	logger *logger.Logger
 	models data.Models
+	wg     sync.WaitGroup
 }
 
 func main() {
@@ -54,6 +59,7 @@ func main() {
 		config: config,
 		logger: logger,
 		models: data.NewModels(db),
+		wg:     sync.WaitGroup{},
 	}
 
 	err = app.serve()
@@ -77,12 +83,42 @@ func (app *application) serve() error {
 		"env":  app.config.env,
 	})
 
+	shutdownErr := make(chan error)
+
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		intercepted := <-sigChan
+
+		app.logger.Info("Server is shutting down", map[string]string{
+			"signal": intercepted.String(),
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := server.Shutdown(ctx)
+		if err != nil {
+			shutdownErr <- err
+		}
+
+		app.logger.Info("Waiting for background processes to finish", nil)
+
+		app.wg.Wait()
+		shutdownErr <- nil
+	}()
+
 	err := server.ListenAndServe()
-	if err == http.ErrServerClosed {
-		return nil
-	} else if err != nil {
+	if !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+
+	err = <-shutdownErr
+	if err != nil {
+		return fmt.Errorf("failed to shutdown server gracefully: %w", err)
+	}
+
+	app.logger.Info("Server stopped", nil)
 
 	return nil
 }
