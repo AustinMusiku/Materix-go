@@ -77,6 +77,12 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 }
 
 func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		app.serverErrorResponse(w, r, errors.New("context missing user value"))
+		return
+	}
+
 	id := chi.URLParam(r, "id")
 	if id == "" {
 		app.badRequestResponse(w, r, errors.New("missing or invalid friend request id"))
@@ -97,6 +103,12 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 		default:
 			app.serverErrorResponse(w, r, err)
 		}
+		return
+	}
+
+	// Ensure only the destination user can accept the request
+	if u.Id != fRequest.DestinationUserId {
+		app.notFoundResponse(w, r, errors.New("friend request not found for user"))
 		return
 	}
 
