@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -41,7 +40,7 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 		Id int `json:"id"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&input)
+	err := app.readJSON(w, r, &input)
 	if err != nil {
 		app.badRequestResponse(w, r, err)
 		return
@@ -86,7 +85,7 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -128,7 +127,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
@@ -214,7 +213,7 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 
 	fId, err := strconv.Atoi(id)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 
