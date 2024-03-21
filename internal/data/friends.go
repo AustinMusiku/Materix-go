@@ -195,34 +195,40 @@ func (fp *FriendPairModel) GetFriendsFor(id int, filters Filters) ([]*User, Meta
 	return friends, meta, nil
 }
 
-func (fp *FriendPairModel) GetSentFor(id int) ([]*DetailedFriendRequest, error) {
-	query := `
-		SELECT friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
+func (fp *FriendPairModel) GetSentFor(id int, filters Filters) ([]*DetailedFriendRequest, Meta, error) {
+	query := fmt.Sprintf(`
+		SELECT count(*) OVER(), 
+			friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, 
+			friends.status, friends.created_at 
 		FROM friends
 		INNER JOIN users
 		ON users.id = friends.destination_user_id
-		WHERE source_user_id = $1 AND status = 'pending'`
+		WHERE source_user_id = $1 AND status = 'pending'
+		ORDER BY friends.%s %s, users.id ASC
+		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	friendRequests := []*DetailedFriendRequest{}
-
-	rows, err := fp.db.QueryContext(ctx, query, id)
+	rows, err := fp.db.QueryContext(ctx, query, id, filters.PageSize, filters.offset())
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return nil, ErrRecordNotFound
+			return nil, Meta{}, ErrRecordNotFound
 		default:
-			return nil, err
+			return nil, Meta{}, err
 		}
 	}
 	defer rows.Close()
+
+	friendRequests := []*DetailedFriendRequest{}
+	totalRecords := 0
 
 	for rows.Next() {
 		var du User
 		var fr FriendRequest
 		err := rows.Scan(
+			&totalRecords,
 			&fr.Id,
 			&du.Id,
 			&du.Name,
@@ -232,7 +238,7 @@ func (fp *FriendPairModel) GetSentFor(id int) ([]*DetailedFriendRequest, error) 
 			&fr.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Meta{}, err
 		}
 		friendRequests = append(friendRequests, &DetailedFriendRequest{
 			DestinationUser: &du,
@@ -244,37 +250,43 @@ func (fp *FriendPairModel) GetSentFor(id int) ([]*DetailedFriendRequest, error) 
 		})
 	}
 
-	return friendRequests, nil
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return friendRequests, meta, nil
 }
 
-func (fp *FriendPairModel) GetReceivedFor(id int) ([]*DetailedFriendRequest, error) {
-	query := `
-		SELECT friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
+func (fp *FriendPairModel) GetReceivedFor(id int, filters Filters) ([]*DetailedFriendRequest, Meta, error) {
+	query := fmt.Sprintf(`
+		SELECT count(*) OVER(),
+			friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
 		FROM friends
 		INNER JOIN users
 		ON users.id = friends.source_user_id
-		WHERE destination_user_id = $1 AND status = 'pending'`
+		WHERE destination_user_id = $1 AND status = 'pending'
+		ORDER BY friends.%s %s, users.id ASC
+		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	friendRequests := []*DetailedFriendRequest{}
-
-	rows, err := fp.db.QueryContext(ctx, query, id)
+	rows, err := fp.db.QueryContext(ctx, query, id, filters.PageSize, filters.offset())
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return nil, ErrRecordNotFound
+			return nil, Meta{}, ErrRecordNotFound
 		default:
-			return nil, err
+			return nil, Meta{}, err
 		}
 	}
 	defer rows.Close()
+
+	friendRequests := []*DetailedFriendRequest{}
+	totalRecords := 0
 
 	for rows.Next() {
 		var su User
 		var fr FriendRequest
 		err := rows.Scan(
+			&totalRecords,
 			&fr.Id,
 			&su.Id,
 			&su.Name,
@@ -284,7 +296,7 @@ func (fp *FriendPairModel) GetReceivedFor(id int) ([]*DetailedFriendRequest, err
 			&fr.CreatedAt,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Meta{}, err
 		}
 		friendRequests = append(friendRequests, &DetailedFriendRequest{
 			SourceUser: &su,
@@ -296,7 +308,8 @@ func (fp *FriendPairModel) GetReceivedFor(id int) ([]*DetailedFriendRequest, err
 		})
 	}
 
-	return friendRequests, nil
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return friendRequests, meta, nil
 }
 
 func (fp *FriendPairModel) Delete(friendRequest *FriendRequest) error {
