@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 )
@@ -145,31 +146,35 @@ func (fp *FriendPairModel) GetFriend(id, friendId int) (*FriendRequest, error) {
 	return &friend, nil
 }
 
-func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
-	query := `
+func (fp *FriendPairModel) GetFriendsFor(id int, filters Filters) ([]*User, Meta, error) {
+	query := fmt.Sprintf(`
 		SELECT 
-			users.id, users.uuid, users.name, users.email, users.avatar_url
+			count(*) OVER(), users.id, users.uuid, users.name, users.email, users.avatar_url
 		FROM friends
 		INNER JOIN users
 		ON 
 			(users.id = friends.source_user_id OR users.id = friends.destination_user_id) AND users.id != $1
 		WHERE 
-			(friends.source_user_id = $1 OR friends.destination_user_id = $1) AND friends.status = 'accepted'`
+			(friends.source_user_id = $1 OR friends.destination_user_id = $1) AND friends.status = 'accepted'
+		ORDER BY friends.%s %s, users.id ASC
+		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	rows, err := fp.db.QueryContext(ctx, query, id)
+	rows, err := fp.db.QueryContext(ctx, query, id, filters.PageSize, filters.offset())
 	if err != nil {
-		return nil, err
+		return nil, Meta{}, err
 	}
 	defer rows.Close()
 
-	var friends []*User
+	friends := []*User{}
+	totalRecords := 0
 
 	for rows.Next() {
 		var user User
 		err := rows.Scan(
+			&totalRecords,
 			&user.Id,
 			&user.Uuid,
 			&user.Name,
@@ -177,16 +182,17 @@ func (fp *FriendPairModel) GetFriendsFor(id int) ([]*User, error) {
 			&user.AvatarUrl,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Meta{}, err
 		}
 		friends = append(friends, &user)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Meta{}, err
 	}
 
-	return friends, nil
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return friends, meta, nil
 }
 
 func (fp *FriendPairModel) GetSentFor(id int) ([]*DetailedFriendRequest, error) {
