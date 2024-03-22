@@ -249,7 +249,7 @@ func (app *application) getReceivedFriendRequestsHandler(w http.ResponseWriter, 
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"met": meta, "requests": requests}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "requests": requests}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
