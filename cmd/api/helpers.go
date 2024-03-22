@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 )
@@ -113,4 +114,19 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 	}
 
 	return i
+}
+
+func (app *application) readDate(qs url.Values, key string, defaultValue string) time.Time {
+	s := qs.Get(key)
+	if s == "" {
+		s = defaultValue
+	}
+
+	s = s + "T00:00:00Z"
+	t, err := time.Parse("02-01-2006T15:04:05Z07:00", s)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return t
 }

@@ -65,13 +65,37 @@ func (app *application) getMyFreeTimesHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	freeTimes, err := app.models.FreeTimes.GetAllFor(u.Id)
+	input := struct {
+		data.Filters
+		From time.Time
+		To   time.Time
+	}{}
+
+	queryStrings := r.URL.Query()
+
+	input.From = app.readDate(queryStrings, "from", "01-01-1970")
+	input.To = app.readDate(queryStrings, "to", "01-01-2100")
+
+	v := validator.New()
+	input.Filters = data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 20, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "start_time", "end_time", "created_at", "-id", "-start_time", "-end_time", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	freeTimes, meta, err := app.models.FreeTimes.GetAllFor(u.Id, input.Filters, input.From, input.To)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "freetimes": freeTimes}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -208,13 +232,37 @@ func (app *application) getMyFriendsFreeTimesHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	freeTimes, err := app.models.FreeTimes.GetAllForFriendsOf(u.Id)
+	input := struct {
+		data.Filters
+		From time.Time
+		To   time.Time
+	}{}
+
+	queryStrings := r.URL.Query()
+
+	input.From = app.readDate(queryStrings, "from", "01-01-1970")
+	input.To = app.readDate(queryStrings, "to", "01-01-2100")
+
+	v := validator.New()
+	input.Filters = data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 50, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "start_time", "end_time", "created_at", "-id", "-start_time", "-end_time", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	freeTimes, meta, err := app.models.FreeTimes.GetAllForFriendsOf(u.Id, input.Filters, input.From, input.To)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "freetimes": freeTimes}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -250,13 +298,36 @@ func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	freeTimes, err := app.models.FreeTimes.GetAllFor(friendId)
+	input := struct {
+		data.Filters
+		From time.Time
+		To   time.Time
+	}{}
+
+	queryStrings := r.URL.Query()
+	input.From = app.readDate(queryStrings, "from", "01-01-1970")
+	input.To = app.readDate(queryStrings, "to", "01-01-2100")
+
+	v := validator.New()
+	input.Filters = data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 20, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "start_time", "end_time", "created_at", "-id", "-start_time", "-end_time", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	freeTimes, meta, err := app.models.FreeTimes.GetAllFor(friendId, data.Filters{}, time.Time{}, time.Time{})
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetimes": freeTimes}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "freetimes": freeTimes}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

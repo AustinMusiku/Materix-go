@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
@@ -116,31 +117,44 @@ func (ft *FreeTimeModel) Get(freetimeId int) (*FreeTime, error) {
 	return &freetime, nil
 }
 
-func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
-	query := `
-		SELECT id, user_id, start_time, end_time, created_at, updated_at, tags, visibility
+func (ft *FreeTimeModel) GetAllFor(userId int, filters Filters, start, end time.Time) ([]*FreeTime, Meta, error) {
+	query := fmt.Sprintf(`
+		SELECT count(*) OVER(), 
+			id, user_id, start_time, end_time, created_at, updated_at, tags, visibility
 		FROM free_times
-		WHERE user_id = $1`
+		WHERE user_id = $1 AND start_time > $2 AND end_time < $3
+		ORDER BY %s %s, id ASC
+		LIMIT $4 OFFSET $5`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	rows, err := ft.db.QueryContext(ctx, query, userId)
+	args := []interface{}{
+		userId,
+		start,
+		end,
+		filters.PageSize,
+		filters.offset(),
+	}
+
+	rows, err := ft.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return nil, ErrRecordNotFound
+			return nil, Meta{}, ErrRecordNotFound
 		default:
-			return nil, err
+			return nil, Meta{}, err
 		}
 	}
 	defer rows.Close()
 
-	var freetimes []*FreeTime
+	freetimes := []*FreeTime{}
+	totalRecords := 0
 
 	for rows.Next() {
 		var ft FreeTime
 		err = rows.Scan(
+			&totalRecords,
 			&ft.Id,
 			&ft.UserId,
 			&ft.StartTime,
@@ -151,13 +165,14 @@ func (ft *FreeTimeModel) GetAllFor(userId int) ([]*FreeTime, error) {
 			&ft.Visibility,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Meta{}, err
 		}
 
 		freetimes = append(freetimes, &ft)
 	}
 
-	return freetimes, nil
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return freetimes, meta, nil
 }
 
 func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
@@ -219,9 +234,10 @@ type FriendFreeTime struct {
 	Tags            []string  `json:"tags"`
 }
 
-func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, error) {
-	query := `
+func (ft *FreeTimeModel) GetAllForFriendsOf(userId int, filters Filters, start, end time.Time) ([]*FriendFreeTime, Meta, error) {
+	query := fmt.Sprintf(`
 		SELECT 
+			count(*) OVER(),
 			ft.id as free_time_id, 
 			u.id as friend_id, 
 			u.name as friend_name, 
@@ -238,8 +254,13 @@ func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, erro
 			(ft.user_id = f.destination_user_id AND f.source_user_id = $1)
 		INNER JOIN users u
 		ON (ft.user_id = u.id)
-		WHERE (f.source_user_id = $1 OR f.destination_user_id = $1)
-		AND f.status = 'accepted'`
+		WHERE 
+			(f.source_user_id = $1 OR f.destination_user_id = $1)
+			AND f.status = 'accepted'
+			AND ft.start_time > $2
+			AND ft.end_time < $3
+		ORDER BY ft.%s %s, ft.id ASC
+		LIMIT $4 OFFSET $5`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
@@ -248,18 +269,20 @@ func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, erro
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return nil, ErrRecordNotFound
+			return nil, Meta{}, ErrRecordNotFound
 		default:
-			return nil, err
+			return nil, Meta{}, err
 		}
 	}
 	defer rows.Close()
 
 	freetimes := []*FriendFreeTime{}
+	totalRecords := 0
 
 	for rows.Next() {
 		var ft FriendFreeTime
 		err = rows.Scan(
+			&totalRecords,
 			&ft.FreetimeId,
 			&ft.FriendId,
 			&ft.FriendName,
@@ -270,13 +293,14 @@ func (ft *FreeTimeModel) GetAllForFriendsOf(userId int) ([]*FriendFreeTime, erro
 			pq.Array(&ft.Tags),
 		)
 		if err != nil {
-			return nil, err
+			return nil, Meta{}, err
 		}
 
 		freetimes = append(freetimes, &ft)
 	}
 
-	return freetimes, nil
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return freetimes, meta, nil
 }
 
 func ValidateFreeTime(v *validator.Validator, freetime *FreeTime) bool {
