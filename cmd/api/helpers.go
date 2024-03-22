@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/AustinMusiku/Materix-go/internal/validator"
 )
 
 type ResponseWrapper map[string]interface{}
@@ -84,4 +89,44 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 	}
 
 	return nil
+}
+
+func (app *application) readString(qs url.Values, key string, defaultValue string) string {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+
+	return s
+}
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+
+	// Try to convert the value to an int. If this fails, add an error message to the
+	// validator instance and return the default value.
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key, "must be an integer value")
+		return defaultValue
+	}
+
+	return i
+}
+
+func (app *application) readDate(qs url.Values, key string, defaultValue string) time.Time {
+	s := qs.Get(key)
+	if s == "" {
+		s = defaultValue
+	}
+
+	s = s + "T00:00:00Z"
+	t, err := time.Parse("02-01-2006T15:04:05Z07:00", s)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return t
 }

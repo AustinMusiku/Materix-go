@@ -17,13 +17,28 @@ func (app *application) getMyFriendsHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	friends, err := app.models.Friends.GetFriendsFor(u.Id)
+	v := validator.New()
+	queryStrings := r.URL.Query()
+
+	filters := data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 10, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "updated_at", "-id", "-updated_at"},
+	}
+
+	if data.ValidateFilters(v, filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	friends, meta, err := app.models.Friends.GetFriendsFor(u.Id, filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"friends": friends}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "friends": friends}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -179,13 +194,28 @@ func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	requests, err := app.models.Friends.GetSentFor(u.Id)
+	v := validator.New()
+	queryStrings := r.URL.Query()
+
+	filters := data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 10, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "created_at", "-id", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	requests, meta, err := app.models.Friends.GetSentFor(u.Id, filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"requests": requests}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "requests": requests}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -198,13 +228,28 @@ func (app *application) getReceivedFriendRequestsHandler(w http.ResponseWriter, 
 		return
 	}
 
-	requests, err := app.models.Friends.GetReceivedFor(u.Id)
+	v := validator.New()
+	queryStrings := r.URL.Query()
+
+	filters := data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 10, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "created_at", "-id", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	requests, meta, err := app.models.Friends.GetReceivedFor(u.Id, filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"requests": requests}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "requests": requests}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
