@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS users_search_idx ON users USING GIN (search);

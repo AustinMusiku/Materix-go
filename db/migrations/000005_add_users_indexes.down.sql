@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS users_search_idx;
