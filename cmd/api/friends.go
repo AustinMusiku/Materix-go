@@ -301,3 +301,39 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) searchMyFriendsHandler(w http.ResponseWriter, r *http.Request) {
+	u, ok := r.Context().Value(userContextKey).(*data.User)
+	if !ok {
+		app.serverErrorResponse(w, r, errors.New("context missing user value"))
+		return
+	}
+
+	v := validator.New()
+	queryStrings := r.URL.Query()
+
+	filters := data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 10, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "updated_at", "-id", "-updated_at"},
+	}
+
+	if data.ValidateFilters(v, filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	q := app.readString(queryStrings, "q", "")
+
+	friends, meta, err := app.models.Friends.SearchFor(u.Id, q, filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "friends": friends}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}

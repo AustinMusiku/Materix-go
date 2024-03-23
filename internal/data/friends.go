@@ -337,12 +337,57 @@ func (fp *FriendPairModel) Delete(friendRequest *FriendRequest) error {
 	return nil
 }
 
-// Reject
-// Get Accepted (Aka Get Friends For)
-// Get Pending (Aka Get Received Friend Requests)
-// Get Sent (Aka Get Sent Friend Requests)
-// Delete
-// Get Friends For
+func (fp *FriendPairModel) SearchFor(id int, q string, filters Filters) ([]*User, Meta, error) {
+	query := fmt.Sprintf(`
+		SELECT count(*) OVER(), 
+			users.id, users.name, users.email, users.avatar_url 
+		FROM friends
+		INNER JOIN users
+		ON (users.id = friends.source_user_id OR users.id = friends.destination_user_id) AND users.id != $1
+		WHERE 
+			(friends.source_user_id = $1 OR friends.destination_user_id = $1) AND friends.status = 'accepted'
+			AND search @@ plainto_tsquery($2)
+		ORDER BY ts_rank(search, plainto_tsquery($2)), friends.%s %s, users.id ASC
+		LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	args := []interface{}{id, q, filters.PageSize, filters.offset()}
+
+	rows, err := fp.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return nil, Meta{}, ErrRecordNotFound
+		default:
+			return nil, Meta{}, err
+		}
+	}
+	defer rows.Close()
+
+	friends := []*User{}
+	totalRecords := 0
+
+	for rows.Next() {
+		var u User
+		err := rows.Scan(
+			&totalRecords,
+			&u.Id,
+			&u.Name,
+			&u.Email,
+			&u.AvatarUrl,
+		)
+		if err != nil {
+			return nil, Meta{}, err
+		}
+		friends = append(friends, &u)
+	}
+
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return friends, meta, nil
+
+}
 
 func ValidateFriendPair(v *validator.Validator, friendRequest *FriendRequest) {
 	v.Check(friendRequest.SourceUserId > 0, "source_user_id", "must be valid")

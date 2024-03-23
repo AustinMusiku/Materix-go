@@ -39,6 +39,7 @@ func (app *application) initRouter() *chi.Mux {
 			r.Delete("/users/me", app.deleteUserHandler)
 
 			r.Get("/friends", app.getMyFriendsHandler)
+			r.Get("/friends/search", app.searchMyFriendsHandler)
 			r.Delete("/friends/{id}", app.removeFriendHandler)
 
 			r.Get("/friends/requests/sent", app.getSentFriendRequestsHandler)
