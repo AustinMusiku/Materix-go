@@ -159,7 +159,7 @@ func (app *application) searchUsersHandler(w http.ResponseWriter, r *http.Reques
 		Page:         app.readInt(queryStrings, "page", 1, v),
 		PageSize:     app.readInt(queryStrings, "page_size", 20, v),
 		Sort:         app.readString(queryStrings, "sort", "id"),
-		SortSafelist: []string{"id", "name", "created_at", "-id", "-name", "-created_at"},
+		SortSafelist: []string{"id", "created_at", "-id", "-created_at"},
 	}
 
 	if data.ValidateFilters(v, filters); !v.Valid() {

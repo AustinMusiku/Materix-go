@@ -248,9 +248,9 @@ func (u *UserModel) Search(q string, filters Filters) (*[]User, Meta, error) {
 	query := fmt.Sprintf(`
 		SELECT count(*) OVER(), id, name, email, avatar_url
 		FROM users
-		WHERE (name ILIKE '%%' || $1 || '%%' OR email ILIKE '%%'|| $1 || '%%')
-		ORDER BY %s %s, name %s
-		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection(), filters.sortDirection())
+		WHERE search @@ plainto_tsquery($1)
+		ORDER BY ts_rank(search, plainto_tsquery($1)), %s %s
+		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
