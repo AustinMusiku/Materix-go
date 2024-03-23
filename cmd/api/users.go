@@ -144,3 +144,37 @@ func (app *application) deleteUserHandler(w http.ResponseWriter, r *http.Request
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) searchUsersHandler(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		app.badRequestResponse(w, r, errors.New("missing search query"))
+		return
+	}
+
+	queryStrings := r.URL.Query()
+	v := validator.New()
+
+	filters := data.Filters{
+		Page:         app.readInt(queryStrings, "page", 1, v),
+		PageSize:     app.readInt(queryStrings, "page_size", 20, v),
+		Sort:         app.readString(queryStrings, "sort", "id"),
+		SortSafelist: []string{"id", "name", "created_at", "-id", "-name", "-created_at"},
+	}
+
+	if data.ValidateFilters(v, filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	users, meta, err := app.models.Users.Search(q, filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"meta": meta, "users": users}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}

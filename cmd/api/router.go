@@ -28,7 +28,7 @@ func (app *application) initRouter() *chi.Mux {
 		r.Post("/auth/login", app.authenticateUserHandler)
 
 		r.Get("/users/{id}", app.getUserHandler)
-		// r.Get("/users/search", app.searchUsersHandler)
+		r.Get("/users/search", app.searchUsersHandler)
 
 		r.Group(func(r chi.Router) {
 			// require auth
