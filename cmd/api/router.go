@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 )
 
 func (app *application) initRouter() *chi.Mux {
@@ -14,6 +15,9 @@ func (app *application) initRouter() *chi.Mux {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: app.config.cors.allowedOrigins,
+	}))
 	r.Use(app.authenticate)
 
 	r.Use(middleware.Heartbeat("/healthcheck"))
