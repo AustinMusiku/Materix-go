@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -31,6 +32,9 @@ type config struct {
 	}
 	jwt struct {
 		secret string
+	}
+	cors struct {
+		allowedOrigins []string
 	}
 }
 
@@ -142,6 +146,11 @@ func configure() config {
 	flag.StringVar(&config.db.dsn, "db-dsn", os.Getenv("DATABASE_URL"), "PostgreSQL DSN")
 
 	flag.StringVar(&config.jwt.secret, "jwt-secret", os.Getenv("JWT_SECRET"), "JWT secret key")
+
+	flag.Func("cors-allowed-origins", "CORS allowed origins", func(val string) error {
+		config.cors.allowedOrigins = strings.Fields(val)
+		return nil
+	})
 
 	flag.Parse()
 
