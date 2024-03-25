@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/AustinMusiku/Materix-go/internal/validator"
 	"golang.org/x/crypto/bcrypt"
@@ -241,6 +242,49 @@ func (u *UserModel) Delete(id int) error {
 	}
 
 	return nil
+}
+
+func (u *UserModel) Search(q string, filters Filters) (*[]User, Meta, error) {
+	query := fmt.Sprintf(`
+		SELECT count(*) OVER(), id, name, email, avatar_url
+		FROM users
+		WHERE search @@ plainto_tsquery($1)
+		ORDER BY ts_rank(search, plainto_tsquery($1)), %s %s
+		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
+	defer cancel()
+
+	args := []interface{}{q, filters.PageSize, filters.offset()}
+
+	rows, err := u.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, Meta{}, err
+	}
+	defer rows.Close()
+
+	users := []User{}
+	totalRecords := 0
+
+	for rows.Next() {
+		var user User
+
+		err := rows.Scan(
+			&totalRecords,
+			&user.Id,
+			&user.Name,
+			&user.Email,
+			&user.AvatarUrl,
+		)
+		if err != nil {
+			return nil, Meta{}, err
+		}
+
+		users = append(users, user)
+	}
+
+	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)
+	return &users, meta, nil
 }
 
 func (p *password) Set(text string) error {

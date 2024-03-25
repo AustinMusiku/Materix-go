@@ -14,5 +14,3 @@ CREATE TABLE IF NOT EXISTS friends (
 
     CONSTRAINT unique_friendship_pair UNIQUE (pair_order);
 );
-
-INSERT INTO friends 
