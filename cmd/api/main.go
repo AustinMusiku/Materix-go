@@ -36,6 +36,11 @@ type config struct {
 	cors struct {
 		allowedOrigins []string
 	}
+	limiter struct {
+		rps     int
+		wl      int
+		enabled bool
+	}
 }
 
 type application struct {
@@ -151,6 +156,10 @@ func configure() config {
 		config.cors.allowedOrigins = strings.Fields(val)
 		return nil
 	})
+
+	flag.IntVar(&config.limiter.rps, "limiter-rps", 10, "Rate limiter requests per second")
+	flag.IntVar(&config.limiter.wl, "limiter-wl", 1, "Rate limiter window length in seconds")
+	flag.BoolVar(&config.limiter.enabled, "limiter-enabled", false, "Enable rate limiter")
 
 	flag.Parse()
 
