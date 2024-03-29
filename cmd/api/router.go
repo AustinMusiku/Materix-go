@@ -2,10 +2,12 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 )
 
 func (app *application) initRouter() *chi.Mux {
@@ -15,6 +17,14 @@ func (app *application) initRouter() *chi.Mux {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(httprate.Limit(
+		app.config.limiter.rps,
+		time.Duration(app.config.limiter.wl)*time.Second,
+		httprate.WithKeyByRealIP(),
+		httprate.WithLimitHandler(func(w http.ResponseWriter, r *http.Request) {
+			app.rateLimitExceededResponse(w, r)
+		}),
+	))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: app.config.cors.allowedOrigins,
 	}))
