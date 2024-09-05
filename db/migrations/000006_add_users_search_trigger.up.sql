@@ -1,8 +1,8 @@
 CREATE FUNCTION users_search_trigger() RETURNS trigger AS $$
 BEGIN
     NEW.search := 
-        setweight(to_tsvector('english', name), 'A') ||
-        setweight(to_tsvector('english', email), 'B');
+        setweight(to_tsvector('english', NEW.name), 'A') ||
+        setweight(to_tsvector('english', NEW.email), 'B');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
