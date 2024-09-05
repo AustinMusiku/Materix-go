@@ -22,9 +22,9 @@ type FriendRequest struct {
 }
 
 type DetailedFriendRequest struct {
-	SourceUser      *User          `json:"source_user,omitempty"`
-	DestinationUser *User          `json:"destination_user,omitempty"`
-	RequestDetails  *FriendRequest `json:"request_details,omitempty"`
+	SourceUser      *User `json:"source_user,omitempty"`
+	DestinationUser *User `json:"destination_user,omitempty"`
+	FriendRequest
 }
 
 type FriendPairModel struct {
@@ -62,7 +62,7 @@ func (fp *FriendPairModel) Insert(friendRequest *FriendRequest) error {
 	query := `
 		INSERT INTO friends (source_user_id, destination_user_id, status)
 		VALUES ($1, $2, $3)
-		RETURNING id, created_at, updated_at, version`
+		RETURNING id, created_at, updated_at`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
@@ -71,7 +71,6 @@ func (fp *FriendPairModel) Insert(friendRequest *FriendRequest) error {
 		&friendRequest.Id,
 		&friendRequest.CreatedAt,
 		&friendRequest.UpdatedAt,
-		&friendRequest.Version,
 	)
 	if err != nil {
 		switch {
@@ -195,16 +194,13 @@ func (fp *FriendPairModel) GetFriendsFor(id int, filters Filters) ([]*User, Meta
 	return friends, meta, nil
 }
 
-func (fp *FriendPairModel) GetSentFor(id int, filters Filters) ([]*DetailedFriendRequest, Meta, error) {
+func (fp *FriendPairModel) GetSentBy(id int, filters Filters) ([]*FriendRequest, Meta, error) {
 	query := fmt.Sprintf(`
 		SELECT count(*) OVER(), 
-			friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, 
-			friends.status, friends.created_at 
+			friends.id, friends.destination_user_id, friends.status, friends.created_at 
 		FROM friends
-		INNER JOIN users
-		ON users.id = friends.destination_user_id
 		WHERE source_user_id = $1 AND status = 'pending'
-		ORDER BY friends.%s %s, users.id ASC
+		ORDER BY friends.%s %s
 		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
@@ -221,32 +217,26 @@ func (fp *FriendPairModel) GetSentFor(id int, filters Filters) ([]*DetailedFrien
 	}
 	defer rows.Close()
 
-	friendRequests := []*DetailedFriendRequest{}
+	friendRequests := []*FriendRequest{}
 	totalRecords := 0
 
 	for rows.Next() {
-		var du User
 		var fr FriendRequest
 		err := rows.Scan(
 			&totalRecords,
 			&fr.Id,
-			&du.Id,
-			&du.Name,
-			&du.Email,
-			&du.AvatarUrl,
+			&fr.DestinationUserId,
 			&fr.Status,
 			&fr.CreatedAt,
 		)
 		if err != nil {
 			return nil, Meta{}, err
 		}
-		friendRequests = append(friendRequests, &DetailedFriendRequest{
-			DestinationUser: &du,
-			RequestDetails: &FriendRequest{
-				Id:        fr.Id,
-				Status:    fr.Status,
-				CreatedAt: fr.CreatedAt,
-			},
+		friendRequests = append(friendRequests, &FriendRequest{
+			Id:                fr.Id,
+			DestinationUserId: fr.DestinationUserId,
+			Status:            fr.Status,
+			CreatedAt:         fr.CreatedAt,
 		})
 	}
 
@@ -254,15 +244,13 @@ func (fp *FriendPairModel) GetSentFor(id int, filters Filters) ([]*DetailedFrien
 	return friendRequests, meta, nil
 }
 
-func (fp *FriendPairModel) GetReceivedFor(id int, filters Filters) ([]*DetailedFriendRequest, Meta, error) {
+func (fp *FriendPairModel) GetReceivedFor(id int, filters Filters) ([]*FriendRequest, Meta, error) {
 	query := fmt.Sprintf(`
 		SELECT count(*) OVER(),
-			friends.id, users.id as user_id, users.name as user_name, users.email, users.avatar_url, friends.status, friends.created_at 
+			friends.id, friends.source_user_id, friends.status, friends.created_at 
 		FROM friends
-		INNER JOIN users
-		ON users.id = friends.source_user_id
 		WHERE destination_user_id = $1 AND status = 'pending'
-		ORDER BY friends.%s %s, users.id ASC
+		ORDER BY friends.%s %s
 		LIMIT $2 OFFSET $3`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
@@ -279,33 +267,28 @@ func (fp *FriendPairModel) GetReceivedFor(id int, filters Filters) ([]*DetailedF
 	}
 	defer rows.Close()
 
-	friendRequests := []*DetailedFriendRequest{}
+	friendRequests := []*FriendRequest{}
 	totalRecords := 0
 
 	for rows.Next() {
-		var su User
 		var fr FriendRequest
 		err := rows.Scan(
 			&totalRecords,
 			&fr.Id,
-			&su.Id,
-			&su.Name,
-			&su.Email,
-			&su.AvatarUrl,
+			&fr.SourceUserId,
 			&fr.Status,
 			&fr.CreatedAt,
 		)
 		if err != nil {
 			return nil, Meta{}, err
 		}
-		friendRequests = append(friendRequests, &DetailedFriendRequest{
-			SourceUser: &su,
-			RequestDetails: &FriendRequest{
-				Id:        fr.Id,
-				Status:    fr.Status,
-				CreatedAt: fr.CreatedAt,
-			},
-		})
+		friendRequests = append(friendRequests, &FriendRequest{
+			Id:           fr.Id,
+			SourceUserId: fr.SourceUserId,
+			Status:       fr.Status,
+			CreatedAt:    fr.CreatedAt,
+		},
+		)
 	}
 
 	meta := calculateMeta(totalRecords, filters.Page, filters.PageSize)

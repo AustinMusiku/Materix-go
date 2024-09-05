@@ -59,6 +59,14 @@ func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
 
+func (app *application) notPermittedResponse(w http.ResponseWriter, r *http.Request, err error) {
+	message := "you are not permitted to perform this action"
+	if err != nil {
+		message = err.Error()
+	}
+	app.errorResponse(w, r, http.StatusForbidden, message)
+}
+
 func (app *application) authenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {
 	message := "you must be authenticated to access this resource"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)

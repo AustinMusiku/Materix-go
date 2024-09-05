@@ -85,7 +85,7 @@ func (app *application) sendFriendRequestHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, ResponseWrapper{"message": "Friend request sent"}, nil)
+	err = app.writeJSON(w, http.StatusCreated, ResponseWrapper{"friend_request": fRequest}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -123,7 +123,7 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	// Ensure only the destination user can accept the request
 	if u.Id != fRequest.DestinationUserId {
-		app.notFoundResponse(w, r, errors.New("friend request not found for user"))
+		app.notPermittedResponse(w, r, nil)
 		return
 	}
 
@@ -133,7 +133,7 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Friend request accepted"}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "friend request accepted"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -171,7 +171,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	// Ensure only the source or destination user can cancel/reject the request
 	if u.Id != fRequest.DestinationUserId || u.Id != fRequest.SourceUserId {
-		app.notFoundResponse(w, r, errors.New("friend request not found for user"))
+		app.notPermittedResponse(w, r, nil)
 		return
 	}
 
@@ -181,7 +181,7 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Friend request rejected"}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "friend request rejected"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -209,7 +209,7 @@ func (app *application) getSentFriendRequestsHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	requests, meta, err := app.models.Friends.GetSentFor(u.Id, filters)
+	requests, meta, err := app.models.Friends.GetSentBy(u.Id, filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

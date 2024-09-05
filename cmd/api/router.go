@@ -59,7 +59,7 @@ func (app *application) initRouter() *chi.Mux {
 			r.Get("/friends/requests/sent", app.getSentFriendRequestsHandler)
 			r.Get("/friends/requests/received", app.getReceivedFriendRequestsHandler)
 			r.Post("/friends/requests", app.sendFriendRequestHandler)
-			r.Put("/friends/requests/{id}", app.acceptFriendRequestHandler)
+			r.Patch("/friends/requests/{id}", app.acceptFriendRequestHandler)
 			r.Delete("/friends/requests/{id}", app.rejectFriendRequestHandler)
 
 			r.Get("/free", app.getMyFreeTimesHandler)
