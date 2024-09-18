@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -199,13 +200,13 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid free time id"))
+		app.badRequestResponse(w, r, errors.New("missing free time id"))
 		return
 	}
 
 	fid, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse free time id: %+v", id))
 		return
 	}
 
@@ -289,13 +290,13 @@ func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid friend id"))
+		app.badRequestResponse(w, r, errors.New("missing friend id"))
 		return
 	}
 
 	friendId, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse friend id: %+v", id))
 		return
 	}
 

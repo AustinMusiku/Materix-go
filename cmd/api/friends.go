@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -100,13 +101,13 @@ func (app *application) acceptFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid friend request id"))
+		app.badRequestResponse(w, r, errors.New("missing friend request id"))
 		return
 	}
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse friend request id: %+v", id))
 		return
 	}
 
@@ -148,13 +149,13 @@ func (app *application) rejectFriendRequestHandler(w http.ResponseWriter, r *htt
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid friend request id"))
+		app.badRequestResponse(w, r, errors.New("missing friend request id"))
 		return
 	}
 
 	fRequestId, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse friend request id: %+v", id))
 		return
 	}
 
@@ -264,13 +265,13 @@ func (app *application) removeFriendHandler(w http.ResponseWriter, r *http.Reque
 
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid friend id"))
+		app.badRequestResponse(w, r, errors.New("missing friend id"))
 		return
 	}
 
 	fId, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse friend id: %+v", id))
 		return
 	}
 

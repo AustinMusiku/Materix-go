@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -13,13 +14,13 @@ import (
 func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		app.badRequestResponse(w, r, errors.New("missing or invalid user id"))
+		app.badRequestResponse(w, r, errors.New("missing user id"))
 		return
 	}
 
 	i, err := strconv.Atoi(id)
 	if err != nil {
-		app.badRequestResponse(w, r, err)
+		app.failedValidationResponse(w, r, fmt.Sprintf("failed to parse user id: %+v", id))
 		return
 	}
 
