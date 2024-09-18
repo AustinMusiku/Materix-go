@@ -35,6 +35,8 @@ type config struct {
 	}
 	cors struct {
 		allowedOrigins []string
+		allowedMethods []string
+		allowedHeaders []string
 	}
 	limiter struct {
 		rps     int
@@ -154,6 +156,16 @@ func configure() config {
 
 	flag.Func("cors-allowed-origins", "CORS allowed origins", func(val string) error {
 		config.cors.allowedOrigins = strings.Fields(val)
+		return nil
+	})
+
+	flag.Func("cors-allowed-methods", "CORS allowed methods", func(val string) error {
+		config.cors.allowedMethods = strings.Fields(val)
+		return nil
+	})
+
+	flag.Func("cors-allowed-headers", "CORS allowed headers", func(val string) error {
+		config.cors.allowedHeaders = strings.Fields(val)
 		return nil
 	})
 

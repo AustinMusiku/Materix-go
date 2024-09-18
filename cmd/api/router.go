@@ -27,6 +27,8 @@ func (app *application) initRouter() *chi.Mux {
 	))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: app.config.cors.allowedOrigins,
+		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 	}))
 	r.Use(app.authenticate)
 
