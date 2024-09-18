@@ -46,13 +46,13 @@ func (app *application) addFreeTimeHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	insertedFreetime, err := app.models.FreeTimes.Insert(&ft, input.Viewers)
+	err = app.models.FreeTimes.Insert(&ft, input.Viewers)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusCreated, ResponseWrapper{"freetime": insertedFreetime}, nil)
+	err = app.writeJSON(w, http.StatusCreated, ResponseWrapper{"freetime": ft}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -144,7 +144,7 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if ft.UserId != u.Id {
-		app.notFoundResponse(w, r, errors.New("free time not found for user"))
+		app.notPermittedResponse(w, r, nil)
 		return
 	}
 
@@ -166,10 +166,22 @@ func (app *application) updateFreeTimeHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	updatedFreetime, err := app.models.FreeTimes.Update(ft)
+	err = app.models.FreeTimes.Update(ft)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
+	}
+
+	// create new instance that omits the version field
+	updatedFreetime := data.FreeTime{
+		Id:         ft.Id,
+		UserId:     ft.UserId,
+		StartTime:  ft.StartTime,
+		EndTime:    ft.EndTime,
+		CreatedAt:  ft.CreatedAt,
+		UpdatedAt:  ft.UpdatedAt,
+		Tags:       ft.Tags,
+		Visibility: ft.Visibility,
 	}
 
 	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"freetime": updatedFreetime}, nil)
@@ -209,7 +221,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	if ft.UserId != u.Id {
-		app.notFoundResponse(w, r, errors.New("free time not found for user"))
+		app.notPermittedResponse(w, r, nil)
 		return
 	}
 
@@ -219,7 +231,7 @@ func (app *application) removeFreeTimeHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "Free time removed"}, nil)
+	err = app.writeJSON(w, http.StatusOK, ResponseWrapper{"message": "free time removed"}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
@@ -321,7 +333,7 @@ func (app *application) getFriendFreeTimesHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	freeTimes, meta, err := app.models.FreeTimes.GetAllFor(friendId, data.Filters{}, time.Time{}, time.Time{})
+	freeTimes, meta, err := app.models.FreeTimes.GetAllFor(friendId, input.Filters, input.From, input.To)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return

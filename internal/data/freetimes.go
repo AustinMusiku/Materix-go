@@ -30,11 +30,11 @@ func NewFreeTimeModel(db *sql.DB) *FreeTimeModel {
 	return &FreeTimeModel{db: db}
 }
 
-func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, error) {
+func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) error {
 	insertFreetimeQuery := `
 		INSERT INTO free_times (user_id, start_time, end_time, tags, visibility)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, updated_at, version`
+		RETURNING id, created_at, updated_at`
 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout+5*time.Second)
 	defer cancel()
@@ -49,18 +49,17 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 
 	tx, err := ft.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = tx.QueryRowContext(ctx, insertFreetimeQuery, args...).Scan(
 		&freetime.Id,
 		&freetime.CreatedAt,
 		&freetime.UpdatedAt,
-		&freetime.Version,
 	)
 	if err != nil {
 		tx.Rollback()
-		return nil, err
+		return err
 	}
 
 	insertViewerQuery := `
@@ -71,16 +70,16 @@ func (ft *FreeTimeModel) Insert(freetime *FreeTime, viewers []int) (*FreeTime, e
 		_, err = tx.ExecContext(ctx, insertViewerQuery, freetime.Id, viewerID)
 		if err != nil {
 			tx.Rollback()
-			return nil, err
+			return err
 		}
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return freetime, nil
+	return nil
 }
 
 func (ft *FreeTimeModel) Get(freetimeId int) (*FreeTime, error) {
@@ -175,7 +174,7 @@ func (ft *FreeTimeModel) GetAllFor(userId int, filters Filters, start, end time.
 	return freetimes, meta, nil
 }
 
-func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
+func (ft *FreeTimeModel) Update(freetime *FreeTime) error {
 	query := `
 		UPDATE free_times
 		SET start_time = $1, end_time = $2, tags = $3, visibility = $4, updated_at = now(), version = version + 1
@@ -198,13 +197,13 @@ func (ft *FreeTimeModel) Update(freetime *FreeTime) (*FreeTime, error) {
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return nil, ErrRecordNotFound
+			return ErrRecordNotFound
 		default:
-			return nil, err
+			return err
 		}
 	}
 
-	return freetime, nil
+	return nil
 }
 
 func (ft *FreeTimeModel) Delete(freetime *FreeTime) error {
@@ -265,7 +264,15 @@ func (ft *FreeTimeModel) GetAllForFriendsOf(userId int, filters Filters, start, 
 	ctx, cancel := context.WithTimeout(context.Background(), QueryTimeout)
 	defer cancel()
 
-	rows, err := ft.db.QueryContext(ctx, query, userId)
+	args := []interface{}{
+		userId,
+		start,
+		end,
+		filters.PageSize,
+		filters.offset(),
+	}
+
+	rows, err := ft.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
