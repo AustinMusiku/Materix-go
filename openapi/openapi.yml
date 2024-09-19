@@ -1,0 +1,1060 @@
+openapi: 3.0.0
+info:
+  title: Materix
+  version: 1.0.0
+  description: Get into the Materix.
+servers:
+  - url: http://localhost:4000/api
+    description: Development server
+  - url: https://materix-5f5aa0a874e1.herokuapp.com/api
+    description: Production server
+tags:
+  - name: authentication
+    description: Operations for handling authentication and authorization
+  - name: user
+    description: Operations about user
+  - name: friend
+    description: Operations about friend
+  - name: free time
+    description: Operations about free time
+  - name: home
+    description: default home page
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    $ref: '#/components/schemas/Tokens'
+        '400':
+          description: Invalid input
+        '409':
+          description: User already exists
+        '422':
+          description: Invalid credentials
+        '500':
+          description: Server error
+  /auth/login:
+    post:
+      tags:
+        - authentication
+      summary: Authenticate a user and create a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tokens:
+                    $ref: '#/components/schemas/Tokens'
+        '400':
+          description: Invalid input
+        '403':
+          description: Unauthorized
+        '422':
+          description: Invalid credentials
+        '500':
+          description: Server error
+  /users/{id}:
+    get:
+      tags:
+        - user
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the user to retrieve
+      responses:
+        '200':
+          description: A user object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Missing user ID
+        '422':
+          description: invalid user ID
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+  /users/search:
+    get:
+      tags:
+        - user
+      summary: Search for users
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of users per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting option
+      responses:
+        '200':
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        user_name:
+                          type: string
+                        email:
+                          type: string
+                        avatar:
+                          type: string
+        '400':
+          description: Missing search query
+        '422':
+          description: Invalid query parameters
+        '500':
+          description: Server error
+  /users/me:
+    get:
+      tags:
+        - user
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A user object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid session or token
+        '401':
+          description: Unauthorized
+        '404':
+          description: User not found
+        '500':
+          description: Server error
+    patch:
+      tags:
+        - user
+      summary: Update current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                avatar:
+                  type: string
+      responses:
+        '200':
+          description: Updated user object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid user ID or JSON parsing error
+        '409':
+          description: Edit conflict
+        '422':
+          description: Invalid user field value(s)
+        '500':
+          description: Server error
+    delete:
+      tags:
+        - user
+      summary: Delete current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User deleted successfully
+        '500':
+          description: Server error
+          
+  /friends:
+    get:
+      tags:
+        - friend
+      summary: Get current user's friends
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of friends per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting option
+      responses:
+        '200':
+          description: A list of friends
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  friends:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Friend'
+        '422':
+          description: Invalid query parameters
+        '500':
+          description: Server error
+  /friends/search:
+    get:
+      tags:
+        - friend
+      summary: Search current user's friends
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of friends per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting option
+      responses:
+        '200':
+          description: A list of friends
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  friends:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Friend'
+        '400':
+          description: Missing search query
+        '422':
+          description: Invalid query parameters
+        '500':
+          description: Server error
+  /friends/{id}:
+    delete:
+      tags:
+        - friend
+      summary: Remove a friend
+      security:
+        - bearerAuth: []
+      
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the friend to remove
+      responses:
+        '200':
+          description: Friend removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: friend removed
+        '400':
+          description: Missing friend ID
+        '422':
+          description: Invalid friend ID
+        '404':
+          description: Friend not found
+        '500':
+          description: Server error
+  /friends/requests/sent:
+    get:
+      tags:
+        - friend
+      summary: Get sent friend requests
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of friend requests per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting option
+      responses:
+        '200':
+          description: A list of sent friend requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  requests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SentFriendRequest'
+        '422':
+          description: Invalid query parameters
+        '500':
+          description: Server error
+
+  /friends/requests/received:
+    get:
+      tags:
+        - friend
+      summary: Get received friend requests
+      security:
+        - bearerAuth: [] 
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+          description: Number of friend requests per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting option
+      responses:
+        '200':
+          description: A list of received friend requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  requests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReceivedFriendRequest'
+        '422':
+          description: Invalid query parameters
+        '500':
+          description: Server error
+
+  /friends/requests:
+    post:
+      tags:
+        - friend
+      summary: Send a friend request
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: integer
+      responses:
+        '201':
+          description: Friend request sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  friend_request:
+                    $ref: '#/components/schemas/FriendRequest'
+        '400':
+          description: JSON parsing error
+        '422':
+          description: Validation error or request conflict
+        '500':
+          description: Server error
+
+  /friends/requests/{id}:
+    patch:
+      tags:
+        - friend
+      summary: Accept a friend request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the friend request to accept
+      responses:
+        '200':
+          description: Friend request accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: friend request accepted
+        '400':
+          description: Missing friend request ID
+        '422':
+          description: Invalid friend request ID
+        '404':
+          description: Friend request not found
+        '500':
+          description: Server error
+    delete:
+      tags:
+        - friend
+      summary: Reject/Cancel a friend request
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the friend request to reject
+      responses:
+        '200':
+          description: Friend request rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: friend request rejected
+        '400':
+          description: Invalid friend request ID
+        '404':
+          description: Friend request not found
+        '500':
+          description: Server error
+
+  /friends/free:
+    get:
+      tags:
+        - friend
+      summary: Get all friends' free time slots
+      security:
+        - bearerAuth: []      
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+            default: '01-01-1970'
+          description: Start date for the query
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+            default: '01-01-2100'
+          description: End date for the query
+      responses:
+        '200':
+          description: A list of free time slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  free_slots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FreeTime'
+        '400':
+          description: Invalid date format
+        '500':
+          description: Server error
+
+  /friends/{id}/free:
+    get:
+      tags:
+        - friend
+      summary: Get a friend's free time slots
+      security:
+        - bearerAuth: []      
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the friend to retrieve free time slots for
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start date for the query
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End date for the query
+      responses:
+        '200':
+          description: A list of free time slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  free_slots:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FreeTime'
+        '400':
+          description: Invalid date format
+        '422':
+          description: Invalid friend ID
+        '404':
+          description: Friend not found
+        '500':
+          description: Server error
+
+  /free:
+    get:
+      tags:
+        - free time
+      summary: Get all free time slots for the current user
+      security:
+        - bearerAuth: []      
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+            default: '01-01-1970'
+          description: Start date to filter free time slots
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+            default: '01-01-2100'
+          description: End date to filter free time slots
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Number of items per page
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum:
+              - id
+              - created_at
+              - '-id'
+              - '-created_at'
+            default: id
+          description: Sorting criteria for the free time slots
+      responses:
+        '200':
+          description: A list of the user's free time slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    $ref: '#/components/schemas/Meta'
+                  freetimes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FreeTime'
+        '422':
+          description: Query parameter validation error
+        '500':
+          description: Server error
+    post:
+      tags:
+        - free time
+      summary: Add a new free time slot for the current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_time:
+                  type: string
+                  format: date-time
+                end_time:
+                  type: string
+                  format: date-time
+                tags:
+                  type: array
+                  items:
+                    type: string
+                visibility:
+                  type: string
+                viewers:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '201':
+          description: Free time slot created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreeTime'
+        '400':
+          description: JSON parsing error
+        '422':
+          description: Invalid input values
+        '500':
+          description: Server error
+
+  /free/{id}:
+    patch:
+      tags:
+        - free time
+      summary: Update free time slot
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the free time slot to update
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_time:
+                  type: string
+                  format: date-time
+                  default: '1970-01-01T00:00:00Z'
+                end_time:
+                  type: string
+                  format: date-time
+                  default: '2100-01-01T00:00:00Z'
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Free time slot updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreeTime'
+        '400':
+          description: Invalid time slot ID or JSON parsing error
+        '403':
+          description: trying to modify another user's free time
+        '404':
+          description: Free time slot not found
+        '422':
+          description: Invalid free time ID
+        '500':
+          description: Server error
+
+    delete:
+      tags:
+        - free time
+      summary: Delete free time slot
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the free time slot to delete
+      responses:
+        '200':
+          description: Free time slot deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: free time deleted
+        '400':
+          description: Invalid time slot ID
+        '403':
+          description: Trying to delete another user's free time
+        '404':
+          description: Free time slot not found
+        '500':
+          description: Server error
+  
+  /:
+    summary: home
+    description: home
+    get:
+      tags:
+        - home
+      summary: 'default homepage '
+      description: default homepage
+      responses:
+        '200':
+          description: default home greeting
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Welcome to the Materix!"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      
+  schemas:
+    UserRegistration:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          
+    Tokens:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+          
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        uuid:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+        provider:
+          enum:
+            - email
+            - google
+            - github
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          
+    Friend:
+      type: object
+      properties:
+        id:
+          type: string
+        uuid:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+          
+    SentFriendRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        destination_user_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+
+    ReceivedFriendRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        source_user_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+
+    FriendRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        source_user_Id:
+          type: integer
+        destination_user_id:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - accepted
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FreeTime:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+        visibility:
+          type: string
+          enum:
+            - public
+            - private
+      required:
+        - id
+        - user_id
+        - start_time
+        - end_time
+
+    Meta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        page_size:
+          type: integer
+        first_page:
+          type: integer
+        last_page:
+          type: integer
+        total_records:
+          type: integer
+      example:
+        current_page: 1
+        page_size: 10
+        first_page: 1
+        last_page: 2
+        total_records: 19
