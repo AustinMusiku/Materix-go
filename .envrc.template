@@ -1,0 +1,18 @@
+export DATABASE_URL=
+
+# CORS OPTIONS
+export ALLOWED_ORIGINS=
+export ALLOWED_METHODS=
+export ALLOWED_HEADERS=
+
+# OAUTH URLs
+export GITHUB_CLIENT_ID=
+export GITHUB_CLIENT_SECRET= 
+
+export GOOGLE_CLIENT_ID=
+export GOOGLE_CLIENT_SECRET= 
+
+export OAUTH2_CALLBACK_STATE=
+
+# Token generation secret
+export JWT_SECRET=
